@@ -4,7 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Send, Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { handleApiError, getOpenAIErrorMessage } from '@/components/ui/error';
+import { useUser } from '@clerk/nextjs';
+import { Send, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { ChatMessage } from '@/types';
 
 interface ChatInterfaceProps {
@@ -26,9 +29,11 @@ export function ChatInterface({
   onCitationClick, 
   className = '' 
 }: ChatInterfaceProps) {
+  const { isSignedIn } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -55,6 +60,8 @@ export function ChatInterface({
     setIsLoading(true);
 
     try {
+      setConnectionError(null);
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,7 +74,9 @@ export function ChatInterface({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -82,13 +91,19 @@ export function ChatInterface({
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      const errorMessage: ChatMessage = {
+      console.error('Chat error:', error);
+      const errorMessage = handleApiError(error);
+      
+      // Set connection error for display
+      setConnectionError(errorMessage);
+      
+      const assistantErrorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error while processing your question. Please try again.',
+        content: `I encountered an error: ${errorMessage}`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, assistantErrorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -101,18 +116,47 @@ export function ChatInterface({
     }
   };
 
+  const retryLastMessage = () => {
+    if (messages.length > 0) {
+      const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+      if (lastUserMessage) {
+        setInput(lastUserMessage.content);
+        setConnectionError(null);
+      }
+    }
+  };
+
   return (
     <div className={`flex flex-col h-full ${className}`}>
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="bg-destructive/10 border-l-4 border-destructive p-3 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <span className="text-sm text-destructive">Connection issue detected</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={retryLastMessage}
+            className="text-xs"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 sm:space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-muted-foreground py-8">
-            <p className="mb-2">Ask me anything about this video!</p>
-            <div className="flex flex-wrap gap-2 justify-center">
+          <div className="text-center text-muted-foreground py-4 sm:py-8">
+            <p className="mb-2 text-sm sm:text-base">Ask me anything about this video!</p>
+            <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setInput("What is this video about?")}
+                className="text-xs sm:text-sm"
               >
                 What is this video about?
               </Button>
@@ -120,6 +164,7 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => setInput("Give me the key takeaways")}
+                className="text-xs sm:text-sm"
               >
                 Key takeaways
               </Button>
@@ -127,6 +172,7 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => setInput("Summarize the main points")}
+                className="text-xs sm:text-sm"
               >
                 Summarize
               </Button>
@@ -147,7 +193,7 @@ export function ChatInterface({
             <Card className="max-w-[80%]">
               <CardContent className="p-3">
                 <div className="flex items-center space-x-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <LoadingSpinner size="sm" />
                   <span className="text-sm text-muted-foreground">Thinking...</span>
                 </div>
               </CardContent>
@@ -158,8 +204,25 @@ export function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Authentication reminder for guests */}
+      {!isSignedIn && messages.length >= 3 && (
+        <div className="border-t bg-muted/50 p-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">
+                Sign up to save this conversation
+              </span>
+            </div>
+            <Button variant="outline" size="sm" className="text-xs">
+              Save Chat
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
-      <div className="border-t p-4">
+      <div className="border-t p-2 sm:p-4">
         <div className="flex space-x-2">
           <Input
             value={input}
@@ -167,12 +230,13 @@ export function ChatInterface({
             onKeyPress={handleKeyPress}
             placeholder="Ask a question about the video..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 text-sm sm:text-base"
           />
           <Button 
             onClick={sendMessage} 
             disabled={isLoading || !input.trim()}
             size="icon"
+            className="flex-shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -240,9 +304,9 @@ function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <Card className={`max-w-[80%] ${isUser ? 'bg-primary text-primary-foreground' : ''}`}>
-        <CardContent className="p-3">
-          <div className="text-sm">
+      <Card className={`max-w-[85%] sm:max-w-[80%] ${isUser ? 'bg-primary text-primary-foreground' : ''}`}>
+        <CardContent className="p-2 sm:p-3">
+          <div className="text-xs sm:text-sm">
             {renderContent(message.content, message.citations)}
           </div>
           <div className={`text-xs mt-1 ${isUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>

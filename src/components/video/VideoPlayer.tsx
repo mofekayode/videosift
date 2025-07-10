@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { LoadingSpinner } from '@/components/ui/loading';
 
 interface VideoPlayerProps {
   videoId: string;
@@ -128,11 +129,14 @@ export function VideoPlayer({
       <div 
         ref={containerRef}
         className="w-full aspect-video"
-        style={{ minHeight: '315px' }}
+        style={{ minHeight: '200px' }}
       />
       {!isReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse">
-          <div className="text-muted-foreground">Loading video...</div>
+        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+          <div className="flex flex-col items-center space-y-3">
+            <LoadingSpinner size="lg" />
+            <div className="text-sm sm:text-base text-muted-foreground">Loading video...</div>
+          </div>
         </div>
       )}
     </div>

@@ -67,10 +67,14 @@
 - [x] Build vector search functionality for transcript chunks
 - [x] Implement LLM chat responses with citations
 - [x] Create split-screen layout for video and chat
-- [ ] Add loading states and progress indicators
-- [ ] Implement error handling for API failures
-- [ ] Create responsive design for mobile devices
+- [x] Add loading states and progress indicators
+- [x] Implement error handling for API failures
+- [x] Create responsive design for mobile devices
 - [ ] Add basic user authentication flow
+- [ ] Dark mode first with toggle option for light mode
+- [ ] Sample questions should only show after we have a youtube link pasted
+- [ ] Click on sample question fills in the search box and auto searches
+- [ ] start chatting should be disabled until we have a youtube link
 
 ### Stage 3: Advanced Features
 **Duration:** 2-3 weeks

@@ -6,6 +6,8 @@ import { VideoPlayer } from '@/components/video/VideoPlayer';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LoadingCard, ProcessingSteps } from '@/components/ui/loading';
+import { ErrorCard, handleApiError } from '@/components/ui/error';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,6 +29,11 @@ export default function WatchPage() {
   const [processingStep, setProcessingStep] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [processingSteps, setProcessingSteps] = useState([
+    { label: 'Loading video metadata', status: 'pending' as const, description: 'Fetching video information from YouTube' },
+    { label: 'Downloading transcript', status: 'pending' as const, description: 'Getting video captions and preparing for chat' },
+    { label: 'Processing content', status: 'pending' as const, description: 'Creating searchable chunks and embeddings' },
+  ]);
 
   useEffect(() => {
     if (videoId) {
@@ -34,12 +41,24 @@ export default function WatchPage() {
     }
   }, [videoId]);
 
+  const updateProcessingStep = (stepIndex: number, status: 'pending' | 'active' | 'completed' | 'error') => {
+    setProcessingSteps(prev => prev.map((step, index) => 
+      index === stepIndex ? { ...step, status } : step
+    ));
+  };
+
   const loadVideo = async () => {
     try {
       setIsProcessing(true);
-      setProcessingStep('Loading video...');
+      setError(null);
       
-      // First, get video metadata (this will create the video record if it doesn't exist)
+      // Reset all steps to pending
+      setProcessingSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
+      
+      // Step 1: Load video metadata
+      updateProcessingStep(0, 'active');
+      setProcessingStep('Loading video metadata...');
+      
       const metadataResponse = await fetch('/api/video/metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,14 +66,17 @@ export default function WatchPage() {
       });
 
       if (!metadataResponse.ok) {
+        updateProcessingStep(0, 'error');
         throw new Error('Failed to load video metadata');
       }
 
       const { data } = await metadataResponse.json();
       setVideoData(data.video);
+      updateProcessingStep(0, 'completed');
 
-      // If transcript is not cached, process it
+      // Step 2: Check and download transcript if needed
       if (!data.video.transcript_cached) {
+        updateProcessingStep(1, 'active');
         setProcessingStep('Downloading transcript...');
         
         const transcriptResponse = await fetch('/api/video/transcript', {
@@ -63,14 +85,33 @@ export default function WatchPage() {
           body: JSON.stringify({ videoId: data.video.youtube_id }),
         });
 
-        if (transcriptResponse.ok) {
-          // Update video data to reflect cached transcript
-          setVideoData(prev => prev ? { ...prev, transcript_cached: true } : null);
+        if (!transcriptResponse.ok) {
+          updateProcessingStep(1, 'error');
+          throw new Error('Failed to download transcript');
         }
+
+        updateProcessingStep(1, 'completed');
+        
+        // Step 3: Process content
+        updateProcessingStep(2, 'active');
+        setProcessingStep('Processing content for search...');
+        
+        // Simulate processing time for better UX
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        updateProcessingStep(2, 'completed');
+        
+        // Update video data to reflect cached transcript
+        setVideoData(prev => prev ? { ...prev, transcript_cached: true } : null);
+      } else {
+        // Transcript already cached, mark remaining steps as completed
+        updateProcessingStep(1, 'completed');
+        updateProcessingStep(2, 'completed');
       }
 
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('Video loading error:', error);
+      setError(handleApiError(error));
     } finally {
       setIsProcessing(false);
       setProcessingStep('');
@@ -105,25 +146,11 @@ export default function WatchPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>{error}</p>
-            <div className="flex space-x-2">
-              <Button onClick={loadVideo} variant="outline">
-                Try Again
-              </Button>
-              <Button asChild>
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Go Back
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ErrorCard
+          title="Failed to Load Video"
+          message={error}
+          onRetry={loadVideo}
+        />
       </div>
     );
   }
@@ -132,13 +159,16 @@ export default function WatchPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="p-6">
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">
-                {processingStep || 'Loading...'}
-              </p>
-            </div>
+          <CardHeader>
+            <CardTitle>Processing Video</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <ProcessingSteps steps={processingSteps} />
+            {processingStep && (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">{processingStep}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -148,40 +178,41 @@ export default function WatchPage() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <header className="border-b p-2 sm:p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              <ArrowLeft className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Back</span>
             </Link>
           </Button>
-          <div>
-            <h1 className="font-semibold text-lg line-clamp-1">{videoData.title}</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-semibold text-sm sm:text-lg line-clamp-1 sm:line-clamp-2">{videoData.title}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Duration: {formatDuration(videoData.duration)}
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" size="sm" asChild className="ml-2 flex-shrink-0">
           <a 
             href={`https://www.youtube.com/watch?v=${videoData.youtube_id}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open in YouTube
+            <ExternalLink className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Open in YouTube</span>
           </a>
         </Button>
       </header>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Desktop: Side by side, Mobile: Stacked */}
+        {/* Mobile/Tablet: Stacked vertically, Desktop: Side by side */}
         <div className="flex flex-col lg:flex-row w-full">
           {/* Video Player */}
-          <div className="lg:w-1/2 flex flex-col">
-            <div className="p-4 border-b lg:border-b-0 lg:border-r">
+          <div className="w-full lg:w-1/2 flex flex-col">
+            {/* Mobile: Fixed aspect ratio container */}
+            <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r">
               <VideoPlayer 
                 videoId={videoData.youtube_id}
                 currentTime={currentTime}
@@ -190,21 +221,24 @@ export default function WatchPage() {
               />
             </div>
             
-            {/* Banner */}
-            <div className="p-4 bg-muted/50 border-b lg:border-r">
-              <p className="text-sm text-muted-foreground text-center">
+            {/* Banner - Hidden on mobile to save space */}
+            <div className="hidden sm:block p-2 sm:p-4 bg-muted/50 border-b lg:border-r">
+              <p className="text-xs sm:text-sm text-muted-foreground text-center">
                 Multi-video search coming soon
               </p>
             </div>
           </div>
 
           {/* Chat Interface */}
-          <div className="lg:w-1/2 flex flex-col min-h-0">
-            <ChatInterface
-              videoId={videoData.id}
-              onCitationClick={handleCitationClick}
-              className="h-full"
-            />
+          <div className="w-full lg:w-1/2 flex flex-col min-h-0 flex-1">
+            {/* Mobile: Take remaining height, Desktop: Full height */}
+            <div className="flex-1 min-h-0 lg:h-full">
+              <ChatInterface
+                videoId={videoData.id}
+                onCitationClick={handleCitationClick}
+                className="h-full"
+              />
+            </div>
           </div>
         </div>
       </div>

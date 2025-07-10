@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { handleApiError } from '@/components/ui/error';
 import { extractVideoId } from '@/lib/youtube';
+import { AuthStatus } from '@/components/auth/AuthGuard';
+import { SignInButton } from '@clerk/nextjs';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -38,7 +42,8 @@ export default function Home() {
       
       router.push(watchUrl);
     } catch (error) {
-      setError('Something went wrong. Please try again.');
+      console.error('Navigation error:', error);
+      setError(handleApiError(error));
       setIsProcessing(false);
     }
   };
@@ -54,15 +59,18 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">
+    <div className="min-h-screen flex items-center justify-center p-2 sm:p-4">
+      <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
+        <div className="text-center space-y-2 sm:space-y-4">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             MindSift
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-lg sm:text-xl text-muted-foreground">
             Chat with any YouTube video using AI
           </p>
+          <div className="flex justify-center">
+            <AuthStatus />
+          </div>
         </div>
         
         <Card>
@@ -112,7 +120,7 @@ export default function Home() {
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <LoadingSpinner size="sm" className="mr-2" />
                   Processing...
                 </>
               ) : (
@@ -123,19 +131,22 @@ export default function Home() {
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
                 Or{' '}
-                <Button variant="link" className="p-0 h-auto">
-                  log in to search entire channels & save chats
-                </Button>
+                <SignInButton mode="modal">
+                  <Button variant="link" className="p-0 h-auto text-sm">
+                    log in to search entire channels & save chats
+                  </Button>
+                </SignInButton>
               </p>
             </div>
           </CardContent>
         </Card>
         
-        <div className="flex flex-wrap gap-2 justify-center">
+        <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
           <Button 
             variant="outline" 
             size="sm"
             onClick={() => handleSuggestionClick('Summarize this video')}
+            className="text-xs sm:text-sm"
           >
             Summarize this video
           </Button>
@@ -143,6 +154,7 @@ export default function Home() {
             variant="outline" 
             size="sm"
             onClick={() => handleSuggestionClick('Give me the key takeaways')}
+            className="text-xs sm:text-sm"
           >
             Give me the key takeaways
           </Button>
@@ -150,6 +162,7 @@ export default function Home() {
             variant="outline" 
             size="sm"
             onClick={() => handleSuggestionClick('Explain the main points')}
+            className="text-xs sm:text-sm"
           >
             Explain the main points
           </Button>
