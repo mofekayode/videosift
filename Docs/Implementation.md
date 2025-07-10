@@ -59,14 +59,14 @@
 **Dependencies:** Stage 1 completion
 
 #### Sub-steps:
-- [ ] Implement YouTube URL parsing and video ID extraction
-- [ ] Create YouTube API service for fetching video metadata
-- [ ] Build transcript downloading and caching system
-- [ ] Implement video player component with YouTube embed
-- [ ] Create chat interface with message history
-- [ ] Build vector search functionality for transcript chunks
-- [ ] Implement LLM chat responses with citations
-- [ ] Create split-screen layout for video and chat
+- [x] Implement YouTube URL parsing and video ID extraction
+- [x] Create YouTube API service for fetching video metadata
+- [x] Build transcript downloading and caching system
+- [x] Implement video player component with YouTube embed
+- [x] Create chat interface with message history
+- [x] Build vector search functionality for transcript chunks
+- [x] Implement LLM chat responses with citations
+- [x] Create split-screen layout for video and chat
 - [ ] Add loading states and progress indicators
 - [ ] Implement error handling for API failures
 - [ ] Create responsive design for mobile devices
