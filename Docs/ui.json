@@ -1,0 +1,295 @@
+{
+    "theme": {
+      "name": "Modern Dark Chat Interface",
+      "description": "Clean, minimalist design with dark theme optimized for AI chat interfaces"
+    },
+    "colors": {
+      "dark": {
+        "background": {
+          "primary": "hsl(0 0% 3.9%)",
+          "secondary": "hsl(0 0% 14.9%)",
+          "accent": "hsl(0 0% 20%)"
+        },
+        "foreground": {
+          "primary": "hsl(0 0% 98%)",
+          "secondary": "hsl(0 0% 78%)",
+          "muted": "hsl(0 0% 45%)"
+        },
+        "border": {
+          "default": "hsl(0 0% 14.9%)",
+          "input": "hsl(0 0% 20%)",
+          "focus": "hsl(280 100% 65%)"
+        },
+        "interactive": {
+          "hover": "hsl(0 0% 25%)",
+          "active": "hsl(0 0% 30%)",
+          "disabled": "hsl(0 0% 10%)"
+        }
+      },
+      "light": {
+        "background": {
+          "primary": "hsl(0 0% 100%)",
+          "secondary": "hsl(0 0% 96%)",
+          "accent": "hsl(0 0% 92%)"
+        },
+        "foreground": {
+          "primary": "hsl(0 0% 9%)",
+          "secondary": "hsl(0 0% 25%)",
+          "muted": "hsl(0 0% 55%)"
+        },
+        "border": {
+          "default": "hsl(0 0% 90%)",
+          "input": "hsl(0 0% 85%)",
+          "focus": "hsl(280 100% 65%)"
+        },
+        "interactive": {
+          "hover": "hsl(0 0% 88%)",
+          "active": "hsl(0 0% 82%)",
+          "disabled": "hsl(0 0% 96%)"
+        }
+      },
+      "accent": {
+        "primary": "hsl(280 100% 65%)",
+        "secondary": "hsl(280 100% 70%)",
+        "muted": "hsl(280 50% 90%)",
+        "foreground": "hsl(0 0% 100%)"
+      }
+    },
+    "typography": {
+      "heading": {
+        "fontSize": "2rem",
+        "fontWeight": "600",
+        "lineHeight": "1.2",
+        "letterSpacing": "-0.02em"
+      },
+      "body": {
+        "fontSize": "0.875rem",
+        "fontWeight": "400",
+        "lineHeight": "1.6"
+      },
+      "small": {
+        "fontSize": "0.75rem",
+        "fontWeight": "400",
+        "lineHeight": "1.5"
+      }
+    },
+    "spacing": {
+      "container": {
+        "maxWidth": "42rem",
+        "padding": "1.5rem"
+      },
+      "sections": {
+        "gap": "2rem"
+      },
+      "elements": {
+        "gap": "1rem"
+      }
+    },
+    "components": {
+      "input": {
+        "dark": {
+          "backgroundColor": "hsl(0 0% 14.9%)",
+          "border": "1px solid hsl(0 0% 20%)",
+          "borderRadius": "0.75rem",
+          "padding": "1rem 1.25rem",
+          "fontSize": "0.875rem",
+          "minHeight": "3rem",
+          "focusRing": "2px solid hsl(280 100% 65%)",
+          "placeholder": "hsl(0 0% 45%)",
+          "color": "hsl(0 0% 98%)"
+        },
+        "light": {
+          "backgroundColor": "hsl(0 0% 100%)",
+          "border": "1px solid hsl(0 0% 85%)",
+          "borderRadius": "0.75rem",
+          "padding": "1rem 1.25rem",
+          "fontSize": "0.875rem",
+          "minHeight": "3rem",
+          "focusRing": "2px solid hsl(280 100% 65%)",
+          "placeholder": "hsl(0 0% 55%)",
+          "color": "hsl(0 0% 9%)"
+        }
+      },
+      "button": {
+        "primary": {
+          "dark": {
+            "backgroundColor": "hsl(0 0% 20%)",
+            "color": "hsl(0 0% 98%)",
+            "border": "1px solid hsl(0 0% 30%)",
+            "borderRadius": "0.5rem",
+            "padding": "0.5rem 1rem",
+            "fontSize": "0.875rem",
+            "fontWeight": "500",
+            "hover": {
+              "backgroundColor": "hsl(0 0% 25%)"
+            }
+          },
+          "light": {
+            "backgroundColor": "hsl(0 0% 9%)",
+            "color": "hsl(0 0% 100%)",
+            "border": "1px solid hsl(0 0% 20%)",
+            "borderRadius": "0.5rem",
+            "padding": "0.5rem 1rem",
+            "fontSize": "0.875rem",
+            "fontWeight": "500",
+            "hover": {
+              "backgroundColor": "hsl(0 0% 18%)"
+            }
+          }
+        },
+        "accent": {
+          "backgroundColor": "hsl(280 100% 65%)",
+          "color": "hsl(0 0% 100%)",
+          "border": "1px solid hsl(280 100% 65%)",
+          "borderRadius": "0.5rem",
+          "padding": "0.5rem 1rem",
+          "fontSize": "0.875rem",
+          "fontWeight": "500",
+          "hover": {
+            "backgroundColor": "hsl(280 100% 70%)"
+          }
+        },
+        "ghost": {
+          "dark": {
+            "backgroundColor": "transparent",
+            "color": "hsl(0 0% 78%)",
+            "border": "none",
+            "hover": {
+              "backgroundColor": "hsl(0 0% 14.9%)"
+            }
+          },
+          "light": {
+            "backgroundColor": "transparent",
+            "color": "hsl(0 0% 25%)",
+            "border": "none",
+            "hover": {
+              "backgroundColor": "hsl(0 0% 96%)"
+            }
+          }
+        }
+      },
+      "card": {
+        "dark": {
+          "backgroundColor": "hsl(0 0% 14.9%)",
+          "border": "1px solid hsl(0 0% 20%)",
+          "borderRadius": "0.75rem",
+          "padding": "1.5rem",
+          "shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+        },
+        "light": {
+          "backgroundColor": "hsl(0 0% 100%)",
+          "border": "1px solid hsl(0 0% 90%)",
+          "borderRadius": "0.75rem",
+          "padding": "1.5rem",
+          "shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.05)"
+        }
+      }
+    },
+    "layout": {
+      "centered": {
+        "display": "flex",
+        "flexDirection": "column",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "minHeight": "100vh",
+        "padding": "1.5rem"
+      },
+      "header": {
+        "position": "fixed",
+        "top": "0",
+        "right": "0",
+        "padding": "1rem",
+        "display": "flex",
+        "gap": "1rem",
+        "alignItems": "center"
+      },
+      "main": {
+        "width": "100%",
+        "maxWidth": "42rem",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "2rem"
+      },
+      "buttonGroup": {
+        "display": "flex",
+        "gap": "0.5rem",
+        "flexWrap": "wrap",
+        "justifyContent": "center"
+      }
+    },
+    "animations": {
+      "fadeIn": {
+        "keyframes": {
+          "from": { "opacity": "0", "transform": "translateY(4px)" },
+          "to": { "opacity": "1", "transform": "translateY(0)" }
+        },
+        "duration": "0.2s",
+        "easing": "ease-out"
+      },
+      "buttonHover": {
+        "transition": "all 0.2s ease-in-out"
+      }
+    },
+    "breakpoints": {
+      "mobile": "640px",
+      "tablet": "768px",
+      "desktop": "1024px"
+    },
+    "accessibility": {
+      "focusVisible": {
+        "outline": "2px solid hsl(0 0% 50%)",
+        "outlineOffset": "2px"
+      },
+      "contrast": {
+        "minimum": "4.5:1",
+        "enhanced": "7:1"
+      }
+    },
+    "customVariables": {
+      "css": {
+        "dark": {
+          "--chat-bg": "hsl(0 0% 3.9%)",
+          "--chat-surface": "hsl(0 0% 14.9%)",
+          "--chat-text": "hsl(0 0% 98%)",
+          "--chat-text-muted": "hsl(0 0% 78%)",
+          "--chat-border": "hsl(0 0% 20%)",
+          "--chat-hover": "hsl(0 0% 25%)",
+          "--chat-accent": "hsl(280 100% 65%)",
+          "--chat-radius": "0.75rem",
+          "--chat-shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+        },
+        "light": {
+          "--chat-bg": "hsl(0 0% 100%)",
+          "--chat-surface": "hsl(0 0% 96%)",
+          "--chat-text": "hsl(0 0% 9%)",
+          "--chat-text-muted": "hsl(0 0% 25%)",
+          "--chat-border": "hsl(0 0% 90%)",
+          "--chat-hover": "hsl(0 0% 88%)",
+          "--chat-accent": "hsl(280 100% 65%)",
+          "--chat-radius": "0.75rem",
+          "--chat-shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.05)"
+        }
+      }
+    },
+    "themeToggle": {
+      "implementation": {
+        "storageKey": "theme-preference",
+        "defaultTheme": "dark",
+        "systemPreference": true
+      },
+      "iconButton": {
+        "size": "2rem",
+        "padding": "0.5rem",
+        "borderRadius": "0.5rem",
+        "backgroundColor": "transparent",
+        "hover": {
+          "backgroundColor": "var(--chat-hover)"
+        },
+        "icons": {
+          "dark": "moon",
+          "light": "sun",
+          "system": "monitor"
+        }
+      }
+    }
+  }
