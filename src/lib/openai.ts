@@ -43,10 +43,11 @@ export async function generateChatResponse(
     end_sec: number;
     video_title?: string;
   }>,
-  model: 'gpt-4o' | 'gpt-3.5-turbo' = 'gpt-4o'
+  model: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-3.5-turbo' = 'gpt-4o-mini'
 ): Promise<string | null> {
   try {
     // Prepare the context from transcript chunks
+    // Use ALL transcript chunks
     const context = transcriptChunks
       .map((chunk, index) => {
         const timestamp = formatTimestamp(chunk.start_sec);
@@ -59,16 +60,20 @@ export async function generateChatResponse(
 
 INSTRUCTIONS:
 - Base your answers ONLY on the provided transcript chunks
-- Include timestamp citations in your responses using the format [timestamp] 
+- Include timestamp citations INLINE throughout your response using the format [timestamp] 
+- Place citations immediately after the specific information they support
 - Use the exact timestamps provided (e.g., [01:23], [15:42])
 - Be conversational and friendly
-- If you can't answer based on the transcript, say so
+- If you can't answer based on the video content, say "The video doesn't cover that topic" instead of "transcript doesn't"
 - Provide specific, detailed answers when possible
+
+EXAMPLE FORMAT:
+"The video discusses quantum mechanics [02:15] and how Einstein disagreed with certain interpretations [04:30]. The speaker explains that..."
 
 AVAILABLE TRANSCRIPT CHUNKS:
 ${context}
 
-Remember to cite specific timestamps when referencing information from the video.`;
+Remember to cite specific timestamps INLINE when referencing information from the video.`;
 
     const completion = await openai.chat.completions.create({
       model,
@@ -77,7 +82,7 @@ Remember to cite specific timestamps when referencing information from the video
         ...messages,
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 800, // Reduced for faster responses
     });
 
     return completion.choices[0]?.message?.content || null;
@@ -119,10 +124,12 @@ function formatTimestamp(seconds: number): string {
 // Extract citations from AI response
 export function extractCitations(content: string): Array<{ timestamp: string; position: number }> {
   const citations = [];
-  const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
+  // Handle both single timestamps [12:34] and ranges [12:34 - 15:67]
+  const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
   let match;
 
   while ((match = timestampRegex.exec(content)) !== null) {
+    // Use the start timestamp for seeking
     citations.push({
       timestamp: match[1],
       position: match.index,

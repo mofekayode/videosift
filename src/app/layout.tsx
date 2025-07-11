@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
+import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { BannerProvider } from "@/contexts/BannerContext";
+import { DynamicHeader } from "@/components/layout/DynamicHeader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,34 +28,16 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" className="dark">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <header className="fixed top-0 right-0 p-2 sm:p-4 flex gap-2 items-center z-50">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
-                  Sign In
-                </Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <Button size="sm" className="text-xs sm:text-sm">
-                  Sign Up
-                </Button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8 sm:w-9 sm:h-9"
-                  }
-                }}
-              />
-            </SignedIn>
-          </header>
-          {children}
+          <ThemeProvider defaultTheme="dark">
+            <BannerProvider>
+              <DynamicHeader />
+              {children}
+            </BannerProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

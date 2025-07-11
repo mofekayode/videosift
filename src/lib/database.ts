@@ -97,12 +97,108 @@ export async function createVideoChunks(chunks: Omit<VideoChunk, 'id' | 'created
   }
 }
 
+// Quick version - creates chunks without embeddings for immediate chat access
+export async function createVideoChunksQuick(chunks: Array<{
+  video_id: string;
+  channel_id?: string;
+  start_sec: number;
+  end_sec: number;
+  text: string;
+  embedding: null;
+}>): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('video_chunks')
+      .insert(chunks);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error creating quick video chunks:', error);
+    return false;
+  }
+}
+
+// Get chunks for a video (used for background embedding processing)
+export async function getVideoChunks(videoId: string): Promise<Array<{
+  id: string;
+  text: string;
+  embedding: number[] | null;
+}>> {
+  try {
+    const { data, error } = await supabase
+      .from('video_chunks')
+      .select('id, text, embedding')
+      .eq('video_id', videoId);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching video chunks:', error);
+    return [];
+  }
+}
+
+// Update a chunk with its embedding
+export async function updateVideoChunkEmbedding(chunkId: string, embedding: number[]): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('video_chunks')
+      .update({ embedding })
+      .eq('id', chunkId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating chunk embedding:', error);
+    return false;
+  }
+}
+
+// Simple function to get all transcript chunks for a video (no embeddings)
+export async function getVideoTranscript(videoId: string): Promise<Array<{
+  id: string;
+  text: string;
+  start_sec: number;
+  end_sec: number;
+}>> {
+  try {
+    const { data, error } = await supabase
+      .from('video_chunks')
+      .select('id, text, start_sec, end_sec')
+      .eq('video_id', videoId)
+      .order('start_sec', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching video transcript:', error);
+    return [];
+  }
+}
+
 export async function searchVideoChunks(
   videoId: string,
   embedding: number[],
   limit: number = 20
 ): Promise<VideoChunk[]> {
   try {
+    console.log(`🔍 Searching video chunks for videoId: ${videoId}, embedding length: ${embedding.length}`);
+    
+    // First, let's try a simple query to get ALL chunks for this video to test
+    const { data: allChunks, error: simpleError } = await supabase
+      .from('video_chunks')
+      .select('*')
+      .eq('video_id', videoId)
+      .limit(limit);
+    
+    if (simpleError) {
+      console.error('Simple query error:', simpleError);
+    } else {
+      console.log(`📊 Simple query found ${allChunks?.length || 0} chunks for videoId: ${videoId}`);
+    }
+    
+    // Try the RPC function
     const { data, error } = await supabase.rpc('search_video_chunks', {
       video_id: videoId,
       query_embedding: embedding,
@@ -110,7 +206,14 @@ export async function searchVideoChunks(
       match_count: limit
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase RPC error:', error);
+      console.log('🔄 Falling back to simple search without embeddings...');
+      // Fallback to simple search if RPC fails
+      return allChunks || [];
+    }
+    
+    console.log(`📊 RPC search found ${data?.length || 0} chunks`);
     return data || [];
   } catch (error) {
     console.error('Error searching video chunks:', error);

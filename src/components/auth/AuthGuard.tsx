@@ -5,6 +5,7 @@ import { SignInButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock, Users, Clock, Zap } from 'lucide-react';
+import { useUserSync } from '@/hooks/useUserSync';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,8 +15,9 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children, fallback, feature }: AuthGuardProps) {
   const { isSignedIn, isLoaded } = useUser();
+  const { isSyncing } = useUserSync();
 
-  if (!isLoaded) {
+  if (!isLoaded || isSyncing) {
     return <div className="animate-pulse bg-muted h-32 rounded" />;
   }
 
@@ -88,8 +90,9 @@ function DefaultAuthFallback({ feature }: DefaultAuthFallbackProps) {
 
 export function AuthStatus() {
   const { user, isSignedIn, isLoaded } = useUser();
+  const { isSyncing } = useUserSync();
 
-  if (!isLoaded) {
+  if (!isLoaded || isSyncing) {
     return <div className="animate-pulse bg-muted h-4 w-20 rounded" />;
   }
 

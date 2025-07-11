@@ -5,6 +5,7 @@ import { getVideoByYouTubeId } from '@/lib/database';
 export async function POST(request: NextRequest) {
   try {
     const { videoId } = await request.json();
+    console.log('📝 Processing transcript request for video:', videoId);
     
     if (!videoId) {
       return NextResponse.json(
@@ -15,8 +16,10 @@ export async function POST(request: NextRequest) {
     
     // Get video from database
     const video = await getVideoByYouTubeId(videoId);
+    console.log('🗃️ Video found in database:', video ? 'Yes' : 'No');
     
     if (!video) {
+      console.log('❌ Video not found in database');
       return NextResponse.json(
         { error: 'Video not found in database' },
         { status: 404 }
@@ -25,6 +28,7 @@ export async function POST(request: NextRequest) {
     
     // Check if transcript is already cached
     if (video.transcript_cached) {
+      console.log('✅ Transcript already cached');
       return NextResponse.json({
         success: true,
         message: 'Transcript already cached',
@@ -53,7 +57,12 @@ export async function POST(request: NextRequest) {
     }
     
   } catch (error) {
-    console.error('Transcript API error:', error);
+    console.error('❌ Transcript API error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : null,
+      type: typeof error
+    });
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : 'Internal server error',

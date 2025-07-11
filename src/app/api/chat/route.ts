@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateChatResponse, generateEmbedding, extractCitations } from '@/lib/openai';
 import { searchVideoChunks, searchChannelChunks } from '@/lib/database';
 
+// Simple in-memory cache for embeddings
+const embeddingCache = new Map<string, { embedding: number[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export async function POST(request: NextRequest) {
   try {
     const { query, videoId, channelId, messages = [] } = await request.json();
@@ -20,25 +24,46 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Generate embedding for the query
-    const embeddingResult = await generateEmbedding(query);
+    // Check cache first for embedding
+    const cacheKey = query.toLowerCase().trim();
+    let embeddingResult;
     
-    if (!embeddingResult) {
-      return NextResponse.json(
-        { error: 'Failed to generate query embedding' },
-        { status: 500 }
-      );
+    const cached = embeddingCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log('📦 Using cached embedding for query:', query);
+      embeddingResult = { embedding: cached.embedding };
+    } else {
+      console.log('🔄 Generating new embedding for query:', query);
+      embeddingResult = await generateEmbedding(query);
+      
+      if (!embeddingResult) {
+        return NextResponse.json(
+          { error: 'Failed to generate query embedding' },
+          { status: 500 }
+        );
+      }
+      
+      // Cache the embedding
+      embeddingCache.set(cacheKey, { 
+        embedding: embeddingResult.embedding, 
+        timestamp: Date.now() 
+      });
     }
     
     // Search for relevant transcript chunks
     let chunks;
+    console.log(`🔍 Searching for chunks with videoId: ${videoId}, channelId: ${channelId}`);
+    
     if (videoId) {
-      chunks = await searchVideoChunks(videoId, embeddingResult.embedding, 20);
+      chunks = await searchVideoChunks(videoId, embeddingResult.embedding, 10); // Reduce chunks for speed
     } else {
-      chunks = await searchChannelChunks(channelId!, embeddingResult.embedding, 20);
+      chunks = await searchChannelChunks(channelId!, embeddingResult.embedding, 10);
     }
     
+    console.log(`📊 Found ${chunks.length} chunks for query: "${query}"`);
+    
     if (chunks.length === 0) {
+      console.log(`❌ No chunks found for videoId: ${videoId}`);
       return NextResponse.json({
         success: true,
         response: "I couldn't find any relevant information in the transcript to answer your question. Please try rephrasing your question or ask about something else from the video.",
@@ -54,14 +79,14 @@ export async function POST(request: NextRequest) {
       video_title: undefined // TODO: Add video title if available
     }));
     
-    // Generate AI response
+    // Generate AI response with faster model
     const response = await generateChatResponse(
       [
         ...messages,
         { role: 'user', content: query }
       ],
       transcriptChunks,
-      videoId ? 'gpt-4o' : 'gpt-3.5-turbo' // Use GPT-3.5 for channels to reduce cost
+      'gpt-4o-mini' // Use mini version for speed
     );
     
     if (!response) {

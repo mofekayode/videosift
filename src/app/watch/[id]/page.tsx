@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useBanner } from '@/contexts/BannerContext';
+import { useParams, useSearchParams } from 'next/navigation';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingCard, ProcessingSteps } from '@/components/ui/loading';
 import { ErrorCard, handleApiError } from '@/components/ui/error';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, X } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 
 interface VideoData {
@@ -21,18 +23,33 @@ interface VideoData {
 }
 
 export default function WatchPage() {
+  const { isSignedIn } = useUser();
   const params = useParams();
+  const searchParams = useSearchParams();
   const videoId = params.id as string;
+  const initialQuestion = searchParams.get('q');
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('Watch page loaded with initialQuestion:', initialQuestion);
+  }, [initialQuestion]);
   
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [processingSteps, setProcessingSteps] = useState([
-    { label: 'Loading video metadata', status: 'pending' as const, description: 'Fetching video information from YouTube' },
-    { label: 'Downloading transcript', status: 'pending' as const, description: 'Getting video captions and preparing for chat' },
-    { label: 'Processing content', status: 'pending' as const, description: 'Creating searchable chunks and embeddings' },
+  const [citationTimestamps, setCitationTimestamps] = useState<string[]>([]);
+  const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null);
+  const { bannerVisible, setBannerVisible, showBanner } = useBanner();
+  const [processingSteps, setProcessingSteps] = useState<{
+    label: string;
+    status: 'pending' | 'active' | 'completed' | 'error';
+    description: string;
+  }[]>([
+    { label: 'Loading video metadata', status: 'pending', description: 'Fetching video information from YouTube' },
+    { label: 'Downloading transcript', status: 'pending', description: 'Getting video captions and preparing for chat' },
+    { label: 'Processing content', status: 'pending', description: 'Creating searchable chunks and embeddings' },
   ]);
 
   useEffect(() => {
@@ -79,7 +96,7 @@ export default function WatchPage() {
         updateProcessingStep(1, 'active');
         setProcessingStep('Downloading transcript...');
         
-        const transcriptResponse = await fetch('/api/video/transcript', {
+        const transcriptResponse = await fetch('/api/video/transcript-quick', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ videoId: data.video.youtube_id }),
@@ -130,6 +147,23 @@ export default function WatchPage() {
     }
     
     setCurrentTime(seconds);
+    setSelectedTimestamp(timestamp);
+  };
+
+  const handleTimestampClick = (timestamp: string) => {
+    // If it's a range like "12:34 - 15:67", extract the first timestamp
+    const firstTimestamp = timestamp.includes(' - ') ? timestamp.split(' - ')[0] : timestamp;
+    handleCitationClick(firstTimestamp);
+  };
+
+  const parseTimestampToSeconds = (timestamp: string): number => {
+    const parts = timestamp.split(':').map(Number);
+    if (parts.length === 2) {
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    return 0;
   };
 
   const formatDuration = (seconds: number): string => {
@@ -176,33 +210,61 @@ export default function WatchPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <header className="border-b p-2 sm:p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/">
-              <ArrowLeft className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-semibold text-sm sm:text-lg line-clamp-1 sm:line-clamp-2">{videoData.title}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Duration: {formatDuration(videoData.duration)}
+    <>
+      {/* Top Banner - Fade in after 2 seconds */}
+      {bannerVisible && (
+        <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+          showBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}>
+          <div className="flex items-center justify-between max-w-6xl mx-auto">
+            <div className="flex-1" />
+            <p className="text-sm font-semibold text-purple-600" style={{ letterSpacing: '0.25px' }}>
+              Multi-channel search coming soon
             </p>
+            <div className="flex-1 flex items-center justify-end">
+              <button
+                onClick={() => setBannerVisible(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close banner"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" asChild className="ml-2 flex-shrink-0">
-          <a 
-            href={`https://www.youtube.com/watch?v=${videoData.youtube_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <ExternalLink className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Open in YouTube</span>
-          </a>
+      )}
+      
+      <div className={`h-screen flex flex-col transition-all duration-300 ${
+        bannerVisible && showBanner ? 'pt-14' : 'pt-2'
+      }`}>{/* Dynamic padding based on banner visibility */}
+      
+      {/* Header */}
+      <header className="border-b p-2 sm:p-4 flex items-center">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/">
+            <ArrowLeft className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back</span>
+          </Link>
         </Button>
+        <div className="min-w-0 flex-1 ml-2 sm:ml-4">
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="font-semibold text-sm sm:text-lg line-clamp-1">{videoData.title}</h1>
+            <Button variant="ghost" size="sm" asChild className="flex-shrink-0 h-6 px-2">
+              <a 
+                href={`https://www.youtube.com/watch?v=${videoData.youtube_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span className="text-xs">YouTube</span>
+              </a>
+            </Button>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Duration: {formatDuration(videoData.duration)}
+          </p>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -221,12 +283,35 @@ export default function WatchPage() {
               />
             </div>
             
-            {/* Banner - Hidden on mobile to save space */}
-            <div className="hidden sm:block p-2 sm:p-4 bg-muted/50 border-b lg:border-r">
-              <p className="text-xs sm:text-sm text-muted-foreground text-center">
-                Multi-video search coming soon
-              </p>
-            </div>
+            {/* Thumbnail Carousel - Only show when there are citations */}
+            {citationTimestamps.length > 0 && (
+              <div className="p-2 sm:p-4 border-b lg:border-r">
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {citationTimestamps.map((timestamp) => (
+                    <div
+                      key={timestamp}
+                      className={`flex-shrink-0 ${timestamp.includes(' - ') ? 'w-32' : 'w-20'} h-12 bg-muted rounded cursor-pointer border-2 ${
+                        selectedTimestamp === timestamp ? 'border-purple-500' : 'border-transparent'
+                      } hover:border-purple-300 transition-colors`}
+                      onClick={() => handleTimestampClick(timestamp)}
+                    >
+                      <div className="w-full h-full rounded bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
+                        <span className={`${timestamp.includes(' - ') ? 'text-[10px]' : 'text-xs'} text-muted-foreground text-center px-1`}>{timestamp}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Channel Search Login Message */}
+            {!isSignedIn && (
+              <div className="p-2 sm:p-4 bg-muted/50 border-b lg:border-r">
+                <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                  Login to search across all videos in this channel
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Chat Interface */}
@@ -237,11 +322,14 @@ export default function WatchPage() {
                 videoId={videoData.id}
                 onCitationClick={handleCitationClick}
                 className="h-full"
+                initialQuestion={initialQuestion}
+                onCitationsUpdate={setCitationTimestamps}
               />
             </div>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

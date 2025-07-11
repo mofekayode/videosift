@@ -70,29 +70,34 @@
 - [x] Add loading states and progress indicators
 - [x] Implement error handling for API failures
 - [x] Create responsive design for mobile devices
-- [ ] Add basic user authentication flow
-- [ ] Dark mode first with toggle option for light mode
-- [ ] Sample questions should only show after we have a youtube link pasted
-- [ ] Click on sample question fills in the search box and auto searches
-- [ ] start chatting should be disabled until we have a youtube link
+- [x] Add basic user authentication flow
+- [x] Dark mode first with toggle option for light mode
+- [x] Sample questions should only show after we have a youtube link pasted
+- [x] Click on sample question fills in the search box and auto searches
+- [x] Start chatting should be disabled until we have a youtube link
+- [x] Use Regex to validate youtube links
+- [x] Ask your first question should be text input multiline
 
 ### Stage 3: Advanced Features
 **Duration:** 2-3 weeks
 **Dependencies:** Stage 2 completion
 
-#### Sub-steps:
-- [ ] Implement channel URL processing and video discovery
-- [ ] Create background job system for channel indexing
-- [ ] Build email notification system with Resend
+#### Sub-steps
+- [ ] For signed in users we should save their chat and have a way for them to see their history
+- [ ] Dont forget to limit how much they can chat in the same session as we are loading all in context
+- [ ] Implement channel URL processing which is getting all the urls in that channel and downloading the transcripts
+- [ ] Modify the UI to allow users to add channels and have a way to see their channels in the home page
+- [ ] Modify the UI to allow users select the channels they want to chat with
+- [ ] Modify the UI to allow users to see the different videos the result is coming from. only load one video at a time and allow the timestamp citation to be clickable to load the right video at that timestamp
+- [ ] Implement background job system for channel indexing
+- [ ] Build email notification system with Resend when the channel is indexed
+- [ ] Chron job to check if there are new videos in the channel and download the transcripts
 - [ ] Implement rate limiting and quota management
-- [ ] Create user dashboard for managing channels
+- [ ] Create user dashboard for managing channels and history
 - [ ] Add thumbnail preview system with timestamp seeking
 - [ ] Implement citation highlighting and navigation
-- [ ] Create admin interface for monitoring system health
 - [ ] Add comprehensive error tracking and logging
 - [ ] Implement caching strategies for improved performance
-- [ ] Add search filters and sorting options
-- [ ] Create user feedback and rating system
 
 ### Stage 4: Polish & Optimization
 **Duration:** 1-2 weeks

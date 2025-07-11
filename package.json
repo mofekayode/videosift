@@ -24,8 +24,11 @@
     "openai": "^5.9.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "svix": "^1.69.0",
     "tailwind-merge": "^3.3.1",
-    "youtube-transcript": "^1.2.1"
+    "youtube-transcript-api": "^2.0.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

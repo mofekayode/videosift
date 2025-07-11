@@ -26,6 +26,7 @@ export function VideoPlayer({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
+  const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -58,28 +59,28 @@ export function VideoPlayer({
               setIsReady(true);
             },
             onStateChange: (event: any) => {
-              // Optional: Handle state changes
-              if (event.data === window.YT.PlayerState.PLAYING && onTimeUpdate) {
-                // Start time tracking
-                const interval = setInterval(() => {
-                  if (playerRef.current && playerRef.current.getCurrentTime) {
-                    const time = Math.floor(playerRef.current.getCurrentTime());
-                    onTimeUpdate(time);
+              // Handle state changes for time tracking
+              if (onTimeUpdate) {
+                if (event.data === window.YT.PlayerState.PLAYING) {
+                  // Clear any existing interval
+                  if (timeUpdateIntervalRef.current) {
+                    clearInterval(timeUpdateIntervalRef.current);
                   }
-                }, 1000);
-
-                // Clean up interval when video pauses/ends
-                const checkState = () => {
-                  if (
-                    playerRef.current && 
-                    playerRef.current.getPlayerState() !== window.YT.PlayerState.PLAYING
-                  ) {
-                    clearInterval(interval);
-                  } else {
-                    setTimeout(checkState, 1000);
+                  
+                  // Start time tracking
+                  timeUpdateIntervalRef.current = setInterval(() => {
+                    if (playerRef.current && playerRef.current.getCurrentTime) {
+                      const time = Math.floor(playerRef.current.getCurrentTime());
+                      onTimeUpdate(time);
+                    }
+                  }, 1000);
+                } else {
+                  // Clear interval when video pauses/ends
+                  if (timeUpdateIntervalRef.current) {
+                    clearInterval(timeUpdateIntervalRef.current);
+                    timeUpdateIntervalRef.current = null;
                   }
-                };
-                checkState();
+                }
               }
             },
           },
@@ -93,16 +94,33 @@ export function VideoPlayer({
     }
 
     return () => {
+      // Clean up interval
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+        timeUpdateIntervalRef.current = null;
+      }
+      
+      // Clean up player
       if (playerRef.current && playerRef.current.destroy) {
         playerRef.current.destroy();
       }
     };
   }, [videoId, onTimeUpdate]);
 
-  // Seek to specific time
+  // Seek to specific time and auto-play
   useEffect(() => {
     if (isReady && playerRef.current && currentTime > 0) {
-      playerRef.current.seekTo(currentTime, true);
+      // Only seek if the time difference is significant (more than 2 seconds)
+      const currentVideoTime = playerRef.current.getCurrentTime ? Math.floor(playerRef.current.getCurrentTime()) : 0;
+      if (Math.abs(currentTime - currentVideoTime) > 2) {
+        playerRef.current.seekTo(currentTime, true);
+        // Auto-play the video after seeking
+        setTimeout(() => {
+          if (playerRef.current && playerRef.current.playVideo) {
+            playerRef.current.playVideo();
+          }
+        }, 100); // Small delay to ensure seeking is complete
+      }
     }
   }, [currentTime, isReady]);
 

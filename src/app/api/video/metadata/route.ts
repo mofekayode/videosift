@@ -6,6 +6,7 @@ import { createVideo, getVideoByYouTubeId } from '@/lib/database';
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json();
+    console.log('🔍 Processing video metadata request for URL:', url);
     
     if (!url) {
       return NextResponse.json(
@@ -15,8 +16,10 @@ export async function POST(request: NextRequest) {
     }
     
     const videoId = extractVideoId(url);
+    console.log('📺 Extracted video ID:', videoId);
     
     if (!videoId) {
+      console.log('❌ Invalid YouTube URL:', url);
       return NextResponse.json(
         { error: 'Invalid YouTube URL' },
         { status: 400 }
@@ -25,12 +28,16 @@ export async function POST(request: NextRequest) {
     
     // Check if video already exists in database
     let video = await getVideoByYouTubeId(videoId);
+    console.log('🗃️ Video in database:', video ? 'Found' : 'Not found');
     
     if (!video) {
       // Fetch metadata from YouTube API
+      console.log('📡 Fetching metadata from YouTube API...');
       const metadata = await getVideoMetadata(videoId);
+      console.log('📊 Metadata result:', metadata ? 'Success' : 'Failed');
       
       if (!metadata) {
+        console.log('❌ Video not found or unavailable');
         return NextResponse.json(
           { error: 'Video not found or unavailable' },
           { status: 404 }
@@ -44,7 +51,7 @@ export async function POST(request: NextRequest) {
         description: metadata.description,
         duration: metadata.duration,
         thumbnail_url: metadata.thumbnail,
-        channel_id: null, // Will be set if part of a channel
+        channel_id: undefined, // Will be set if part of a channel
         transcript_cached: false
       });
       

@@ -3,18 +3,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { handleApiError, getOpenAIErrorMessage } from '@/components/ui/error';
-import { useUser } from '@clerk/nextjs';
+import { useUser, SignUpButton } from '@clerk/nextjs';
 import { Send, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { ChatMessage } from '@/types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ChatInterfaceProps {
   videoId?: string;
   channelId?: string;
   onCitationClick?: (timestamp: string) => void;
   className?: string;
+  initialQuestion?: string;
+  onCitationsUpdate?: (timestamps: string[]) => void;
 }
 
 interface Citation {
@@ -27,13 +32,16 @@ export function ChatInterface({
   videoId, 
   channelId, 
   onCitationClick, 
-  className = '' 
+  className = '',
+  initialQuestion,
+  onCitationsUpdate
 }: ChatInterfaceProps) {
   const { isSignedIn } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [autoSearchExecuted, setAutoSearchExecuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -44,31 +52,71 @@ export function ChatInterface({
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-    if (!videoId && !channelId) return;
+  // Auto-search with initial question from URL parameter
+  useEffect(() => {
+    if (initialQuestion && initialQuestion.trim() && !autoSearchExecuted && videoId) {
+      console.log('Auto-search triggered for:', initialQuestion);
+      setAutoSearchExecuted(true);
+      
+      // Set up the initial message first
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: initialQuestion.trim(),
+        timestamp: new Date(),
+      };
+      
+      setMessages([userMessage]);
+      setInput('');
+    }
+  }, [initialQuestion, videoId, autoSearchExecuted]);
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
+  // Separate effect to handle the actual search after message is set
+  useEffect(() => {
+    if (autoSearchExecuted && initialQuestion && messages.length > 0 && !isLoading && videoId) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'user' && lastMessage.content === initialQuestion.trim()) {
+        setIsLoading(true);
+        handleAutoSearch(initialQuestion.trim());
+      }
+    }
+  }, [autoSearchExecuted, initialQuestion, messages, isLoading, videoId]);
 
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+  // Update citations whenever messages change
+  useEffect(() => {
+    if (onCitationsUpdate) {
+      const allTimestamps: string[] = [];
+      messages.forEach(msg => {
+        if (msg.content && msg.role === 'assistant') {
+          // Extract original citation text from message content
+          const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
+          let match;
+          while ((match = timestampRegex.exec(msg.content)) !== null) {
+            const fullMatch = match[0]; // This includes the brackets and full range
+            const displayText = fullMatch.slice(1, -1); // Remove brackets for display
+            if (!allTimestamps.includes(displayText)) {
+              allTimestamps.push(displayText);
+            }
+          }
+        }
+      });
+      onCitationsUpdate(allTimestamps);
+    }
+  }, [messages, onCitationsUpdate]);
+
+  const handleAutoSearch = async (query: string) => {
+    if (!query.trim() || isLoading) return;
+    if (!videoId) return;
 
     try {
       setConnectionError(null);
       
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/chat-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: userMessage.content,
+          query,
           videoId,
-          channelId,
           messages: messages.slice(-5) // Keep last 5 messages for context
         }),
       });
@@ -109,7 +157,26 @@ export function ChatInterface({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
+    if (!videoId) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const query = input.trim();
+    setInput('');
+    setIsLoading(true);
+
+    await handleAutoSearch(query);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -147,32 +214,71 @@ export function ChatInterface({
       )}
       
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 sm:space-y-4">
+      <div className="flex-1 overflow-y-auto bg-background">
         {messages.length === 0 && (
-          <div className="text-center text-muted-foreground py-4 sm:py-8">
-            <p className="mb-2 text-sm sm:text-base">Ask me anything about this video!</p>
-            <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
+          <div className="max-w-4xl mx-auto px-4 py-12 text-center">
+            <div className="text-muted-foreground mb-6">
+              <h3 className="text-lg font-medium mb-2">Ask me anything about this video!</h3>
+              <p className="text-sm">I can help you understand the content, find specific information, or answer questions.</p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setInput("What is this video about?")}
-                className="text-xs sm:text-sm"
+                onClick={() => {
+                  const question = "What is this video about?";
+                  const userMessage: ChatMessage = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: question,
+                    timestamp: new Date(),
+                  };
+                  setMessages([userMessage]);
+                  setIsLoading(true);
+                  handleAutoSearch(question);
+                }}
+                className="text-sm bg-background hover:bg-muted/50"
+                disabled={isLoading}
               >
                 What is this video about?
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setInput("Give me the key takeaways")}
-                className="text-xs sm:text-sm"
+                onClick={() => {
+                  const question = "Give me the key takeaways";
+                  const userMessage: ChatMessage = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: question,
+                    timestamp: new Date(),
+                  };
+                  setMessages([userMessage]);
+                  setIsLoading(true);
+                  handleAutoSearch(question);
+                }}
+                className="text-sm bg-background hover:bg-muted/50"
+                disabled={isLoading}
               >
                 Key takeaways
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setInput("Summarize the main points")}
-                className="text-xs sm:text-sm"
+                onClick={() => {
+                  const question = "Summarize the main points";
+                  const userMessage: ChatMessage = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: question,
+                    timestamp: new Date(),
+                  };
+                  setMessages([userMessage]);
+                  setIsLoading(true);
+                  handleAutoSearch(question);
+                }}
+                className="text-sm bg-background hover:bg-muted/50"
+                disabled={isLoading}
               >
                 Summarize
               </Button>
@@ -189,15 +295,20 @@ export function ChatInterface({
         ))}
 
         {isLoading && (
-          <div className="flex justify-start">
-            <Card className="max-w-[80%]">
-              <CardContent className="p-3">
-                <div className="flex items-center space-x-2">
-                  <LoadingSpinner size="sm" />
-                  <span className="text-sm text-muted-foreground">Thinking...</span>
+          <div className="max-w-4xl mx-auto px-4 py-6">
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-medium text-primary">MAI</span>
+              </div>
+              <div className="flex-1 max-w-[80%]">
+                <div className="rounded-2xl px-4 py-3 bg-transparent">
+                  <div className="flex items-center space-x-2">
+                    <LoadingSpinner size="sm" />
+                    <span className="text-sm text-muted-foreground">Analyzing video...</span>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
 
@@ -206,40 +317,45 @@ export function ChatInterface({
 
       {/* Authentication reminder for guests */}
       {!isSignedIn && messages.length >= 3 && (
-        <div className="border-t bg-muted/50 p-3">
-          <div className="flex items-center justify-between text-sm">
+        <div className="border-t bg-[#2D9CFF]/5 p-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
                 Sign up to save this conversation
               </span>
             </div>
-            <Button variant="outline" size="sm" className="text-xs">
-              Save Chat
-            </Button>
+            <SignUpButton mode="modal">
+              <Button size="sm" className="text-xs flex-shrink-0 bg-[#2D9CFF] hover:bg-[#1E8AE6] text-white">
+                Save Chat
+              </Button>
+            </SignUpButton>
           </div>
         </div>
       )}
 
       {/* Input */}
-      <div className="border-t p-2 sm:p-4">
-        <div className="flex space-x-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask a question about the video..."
-            disabled={isLoading}
-            className="flex-1 text-sm sm:text-base"
-          />
-          <Button 
-            onClick={sendMessage} 
-            disabled={isLoading || !input.trim()}
-            size="icon"
-            className="flex-shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+      <div className="p-4 border-t bg-background">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What do you want to know next?"
+              disabled={isLoading}
+              className="w-full resize-none border-0 bg-muted/50 rounded-xl p-4 pr-12 text-sm focus:ring-0 focus:outline-none focus:border-transparent focus:ring-transparent focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/60 min-h-[60px] max-h-40"
+              rows={2}
+            />
+            <Button 
+              onClick={sendMessage} 
+              disabled={isLoading || !input.trim()}
+              size="icon"
+              className="absolute right-2 bottom-2 h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -260,60 +376,104 @@ function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
     }
   };
 
-  const renderContent = (content: string, citations?: Citation[]) => {
-    if (!citations || citations.length === 0) {
-      return content;
-    }
+  const renderContentWithCitations = (content: string, citations?: Citation[]) => {
+    return (
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Custom text component to handle timestamps
+          p: ({ children }) => {
+            const processChildren = (child: any): any => {
+              if (typeof child === 'string') {
+                // Replace citation timestamps with clickable links
+                // Handle both single timestamps [12:34] and ranges [12:34 - 15:67]
+                const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
+                const parts = [];
+                let lastIndex = 0;
+                let match;
 
-    // Replace citation timestamps with clickable links
-    let renderedContent = content;
-    const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
-    
-    const parts = [];
-    let lastIndex = 0;
-    let match;
+                while ((match = timestampRegex.exec(child)) !== null) {
+                  // Add text before the timestamp
+                  if (match.index > lastIndex) {
+                    parts.push(child.slice(lastIndex, match.index));
+                  }
 
-    while ((match = timestampRegex.exec(content)) !== null) {
-      // Add text before the timestamp
-      if (match.index > lastIndex) {
-        parts.push(content.slice(lastIndex, match.index));
-      }
+                  // Add clickable timestamp
+                  const startTimestamp = match[1];
+                  const endTimestamp = match[2];
+                  const displayText = endTimestamp ? `${startTimestamp} - ${endTimestamp}` : startTimestamp;
+                  
+                  parts.push(
+                    <button
+                      key={`timestamp-${match.index}`}
+                      onClick={() => handleCitationClick(startTimestamp)}
+                      className="text-[#2D9CFF] hover:text-[#1E8AE6] underline mx-1"
+                      title={`Jump to ${startTimestamp}`}
+                    >
+                      [{displayText}]
+                    </button>
+                  );
 
-      // Add clickable timestamp
-      const timestamp = match[1];
-      parts.push(
-        <button
-          key={match.index}
-          onClick={() => handleCitationClick(timestamp)}
-          className="text-blue-500 hover:text-blue-700 underline mx-1"
-        >
-          [{timestamp}]
-        </button>
-      );
+                  lastIndex = match.index + match[0].length;
+                }
 
-      lastIndex = match.index + match[0].length;
-    }
+                // Add remaining text
+                if (lastIndex < child.length) {
+                  parts.push(child.slice(lastIndex));
+                }
 
-    // Add remaining text
-    if (lastIndex < content.length) {
-      parts.push(content.slice(lastIndex));
-    }
+                return parts.length > 1 ? parts : child;
+              }
+              return child;
+            };
 
-    return parts;
+            const processedChildren = Array.isArray(children) 
+              ? children.map(processChildren) 
+              : processChildren(children);
+
+            return <div className="mb-2">{processedChildren}</div>;
+          },
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+          li: ({ children }) => <li className="mb-1">{children}</li>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    );
   };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <Card className={`max-w-[85%] sm:max-w-[80%] ${isUser ? 'bg-primary text-primary-foreground' : ''}`}>
-        <CardContent className="p-2 sm:p-3">
-          <div className="text-xs sm:text-sm">
-            {renderContent(message.content, message.citations)}
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} gap-3`}>
+        {!isUser && (
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-medium text-primary">MAI</span>
           </div>
-          <div className={`text-xs mt-1 ${isUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+        )}
+        <div className={`flex-1 ${isUser ? 'max-w-[80%] ml-auto' : 'max-w-[80%]'}`}>
+          <div className={`rounded-2xl px-4 py-3 ${
+            isUser 
+              ? 'bg-[#3B3B4F] text-white ml-auto' 
+              : 'bg-[#1E1E29] text-white'
+          }`}>
+            <div className="text-sm leading-relaxed">
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                {renderContentWithCitations(message.content, message.citations)}
+              </div>
+            </div>
+          </div>
+          <div className={`text-[11px] mt-2 text-[#7A7A8C] ${isUser ? 'text-right' : ''}`}>
             {message.timestamp.toLocaleTimeString()}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        {isUser && (
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-medium">You</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

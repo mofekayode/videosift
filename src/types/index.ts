@@ -10,7 +10,9 @@ export interface Video {
   id: string;
   youtube_id: string;
   title: string;
+  description?: string;
   duration: number;
+  thumbnail_url?: string;
   channel_id?: string;
   transcript_cached: boolean;
   created_at: string;

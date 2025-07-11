@@ -1,37 +1,47 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import YoutubeTranscriptApi from 'youtube-transcript-api';
 import { generateEmbedding } from './openai';
 import { createVideoChunks, updateVideoTranscriptStatus } from './database';
 import { TranscriptSegment } from '@/types';
 
 interface TranscriptItem {
+  start: string;
+  duration: string;
   text: string;
-  duration: number;
-  offset: number;
 }
 
 export async function downloadTranscript(videoId: string): Promise<TranscriptSegment[]> {
   try {
     console.log(`📥 Downloading transcript for video: ${videoId}`);
     
-    // Get transcript from YouTube
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    // Get the transcript using the static method (v2.0.4 API)
+    const transcript: TranscriptItem[] = await YoutubeTranscriptApi.getTranscript(videoId);
+    console.log('✅ Raw transcript received:', transcript ? `${transcript.length} segments` : 'null/undefined');
     
     if (!transcript || transcript.length === 0) {
-      throw new Error('No transcript available for this video');
+      throw new Error('No transcript available for this video. The video may not have captions or may be private.');
     }
     
-    // Convert to our format
-    const segments: TranscriptSegment[] = transcript.map((item: TranscriptItem) => ({
-      start: Math.floor(item.offset / 1000), // Convert ms to seconds
-      end: Math.floor((item.offset + item.duration) / 1000),
-      text: item.text.trim()
-    }));
+    console.log(`✅ Downloaded ${transcript.length} transcript segments`);
     
-    console.log(`✅ Downloaded ${segments.length} transcript segments`);
+    // Convert to our format (matching your working code structure)
+    const segments: TranscriptSegment[] = transcript.map((segment: TranscriptItem) => {
+      const startTime = parseFloat(segment.start); // Convert string to number
+      const duration = parseFloat(segment.duration); // Convert string to number
+      
+      return {
+        start: Math.floor(startTime),
+        end: Math.floor(startTime + duration),
+        text: segment.text.trim()
+      };
+    });
+    
+    console.log(`✅ Converted ${segments.length} transcript segments`);
     return segments;
     
   } catch (error) {
     console.error('Transcript download error:', error);
+    console.error('Error type:', typeof error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     throw new Error(`Failed to download transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -63,7 +73,7 @@ export async function processAndCacheTranscript(
       if (embeddingResult) {
         chunksWithEmbeddings.push({
           video_id: dbVideoId,
-          channel_id: channelId || null,
+          channel_id: channelId || undefined,
           start_sec: chunk.start,
           end_sec: chunk.end,
           text: chunk.text,
