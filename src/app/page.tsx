@@ -13,6 +13,7 @@ import { extractVideoId, isValidYouTubeUrl } from '@/lib/youtube';
 import { AuthStatus } from '@/components/auth/AuthGuard';
 import { SignInButton } from '@clerk/nextjs';
 import { Loader2, X } from 'lucide-react';
+import Image from 'next/image';
 
 export default function Home() {
   const router = useRouter();
@@ -382,9 +383,11 @@ export default function Home() {
             
             {videoPreview && (
               <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg border shadow-sm animate-in fade-in-0">
-                <img 
+                <Image 
                   src={videoPreview.thumbnail} 
                   alt="Video thumbnail" 
+                  width={64}
+                  height={48}
                   className="w-16 h-12 object-cover rounded shadow-sm"
                 />
                 <div className="flex-1 min-w-0">
