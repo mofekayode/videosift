@@ -1,6 +1,45 @@
 import { supabase, supabaseAdmin } from './supabase';
 import { User, Video, Channel, VideoChunk, ChannelQueue, ChatSession, ChatMessage } from '@/types';
 
+// Channel operations with OpenAI Assistant
+export async function updateChannelAssistant(
+  channelId: string, 
+  assistantId: string, 
+  vectorStoreId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('channels')
+      .update({ 
+        assistant_id: assistantId,
+        vector_store_id: vectorStoreId
+      })
+      .eq('id', channelId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating channel assistant:', error);
+    return false;
+  }
+}
+
+export async function getChannelVideosWithTranscripts(channelId: string) {
+  try {
+    const { data: videos, error } = await supabase
+      .from('videos')
+      .select('youtube_id, title, transcript')
+      .eq('channel_id', channelId)
+      .not('transcript', 'is', null);
+    
+    if (error) throw error;
+    return videos;
+  } catch (error) {
+    console.error('Error fetching channel videos with transcripts:', error);
+    return [];
+  }
+}
+
 // User operations
 export async function createUser(clerkId: string, email: string): Promise<User | null> {
   try {
@@ -253,13 +292,41 @@ export async function searchChannelChunks(
 // Channel operations
 export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>): Promise<Channel | null> {
   try {
+    // Check if supabaseAdmin is available
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not available');
+      return null;
+    }
+
+    // First check if channel already exists for this user
+    const { data: existingChannel } = await supabaseAdmin
+      .from('channels')
+      .select('*')
+      .eq('youtube_channel_id', channel.youtube_channel_id)
+      .eq('owner_user_id', channel.owner_user_id)
+      .single();
+
+    if (existingChannel) {
+      console.log('Channel already exists for this user:', existingChannel);
+      return existingChannel;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('channels')
       .insert([channel])
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Detailed error creating channel:', {
+        error,
+        channel,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('Error creating channel:', error);
@@ -407,15 +474,32 @@ export async function updateQueueItemStatus(
 }
 
 // Chat session operations
-export async function createChatSession(videoId: string, userId?: string, anonId?: string): Promise<ChatSession | null> {
+export async function createChatSession(
+  userId?: string, 
+  anonId?: string, 
+  channelId?: string,
+  videoIds?: string[]
+): Promise<ChatSession | null> {
   try {
+    const sessionData: any = {
+      user_id: userId || null,
+      anon_id: anonId || null
+    };
+    
+    // Handle different session types
+    if (channelId) {
+      sessionData.channel_id = channelId;
+    } else if (videoIds && videoIds.length === 1) {
+      // Single video chat
+      sessionData.video_id = videoIds[0];
+    } else if (videoIds && videoIds.length > 1) {
+      // Multi-video chat - store as JSON
+      sessionData.video_ids = JSON.stringify(videoIds);
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('chat_sessions')
-      .insert([{
-        video_id: videoId,
-        user_id: userId || null,
-        anon_id: anonId || null
-      }])
+      .insert([sessionData])
       .select()
       .single();
     

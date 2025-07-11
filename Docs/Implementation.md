@@ -91,22 +91,25 @@
 - [x] Remove the option to type a question if they paste a channel url
 - [x] Implement background job system for channel indexing
 - [x] Build email notification system with Resend when the channel is indexed
-- [ ] Chron job to check if there are new videos in the channel and download the transcripts
-- [ ] Modify the UI to allow users select the channels they want to chat with for signed in users for now they can only chat with one channel as multi channel chat is comming soon so they can only index a channel.
-- [ ] Explore using openai assistant that allows you add files. Just have a file that contains all the video transcripts for all videos in a channel and let it do the RAG itself so instead of putting the whole video transcript in the context we can just put the file name and let the assistant do the RAG itself
-- [ ] Modify the UI to allow users to see the different videos the result is coming from. Just have a list of 
-videos and citations on the left pane similar to what we already have.
-- [ ] Implement rate limiting and quota management
-- [ ] Create user dashboard for managing channels and history
-- [ ] Add comprehensive error tracking and logging
-- [ ] Implement caching strategies for improved performance
-- [ ] Surface a mini roadmap modal that shows “Coming soon: multi channel search, upload, enterprise” so you can brag without confusing.
-- [ ] Put a hard query cap per guest per day and show a progress ring on the chat button that counts down remaining queries. Counter pill uses accent background at ≥ 20 % and fades to warm amber under 20 %.
+- [x] Chron job to check if there are new videos in the channel and download the transcripts
+- [x] Modify the UI to allow users select the channels they want to chat with for signed in users for now they can only chat with one channel as multi channel chat is comming soon so they can only index a channel.
+- [x] Explore using openai assistant that allows you add files. Just have a file that contains all the video transcripts for all videos in a channel and let it do the RAG itself so instead of putting the whole video transcript in the context we can just put the file name and let the assistant do the RAG itself
+- [x] Modify the UI to allow users to see the different videos the result is coming from. Just have a list of videos and citations on the left pane similar to what we already have.
+- [x] Implement rate limiting and quota management
+- [x] Create user dashboard for managing channels and history
+- [x] Add comprehensive error tracking and logging
+- [x] Implement caching strategies for improved performance
+- [x] Surface a mini roadmap modal that shows “Coming soon: multi channel search, upload, enterprise” so you can brag without confusing.
+- [x] Put a hard query cap per guest per day and show a progress ring on the chat button that counts down remaining queries. Counter pill uses accent background at ≥ 20 % and fades to warm amber under 20 %.
 Progress ring animates around the Send button as credits burn. A tiny ⓘ icon next to the counter opens a popover with the full quota table.
-- [ ] FREE BETA Ask up to 30 questions per day and index 1 YouTube channel. Pro plans launch on July 18. Early testers get 40 % off for life.
-- [ ] PRO PLAN COMING SOON You’re at 12 / 30 free questions today. Need more juice? Join the wait-list and lock lifetime pricing.
-- [ ] CHANNEL LIMIT One free channel while we’re in beta. Pro unlocks 10 channels and priority indexing (launches Jul 18).
-- [ ] Implement analytics and user behavior tracking with posthog
+- [x] FREE BETA Ask up to 30 questions per day and index 1 YouTube channel. Pro plans launch on August 5th. Early testers get 50% off for 2 months.
+- [x] Implement analytics and user behavior tracking with posthog
+- [x] Implement waitlist functionality with email notifications and position tracking
+- [x] Create waitlist database table with auto-incrementing positions
+- [x] Add toast notifications for waitlist actions
+- [x] Show waitlist position instead of join button for existing members
+- [x] Update roadmap with multimodal search and proper timeline
+- [x] Fix badge hover states to use appropriate color variations
 
 
 

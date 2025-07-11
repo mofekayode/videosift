@@ -833,3 +833,244 @@ Import trace for requested module:
 ✅ Email sent successfully: ea272cdb-f6da-4e97-a80b-5acccf67ab96
 ✅ All test emails sent successfully
  GET /api/debug/send-test-emails 200 in 3024ms
+ ✓ Compiled in 1495ms (2487 modules)
+ GET / 200 in 1422ms
+ GET / 200 in 812ms
+ GET / 200 in 11ms
+ GET / 200 in 8ms
+ ✓ Compiled in 350ms (1066 modules)
+ GET / 200 in 22ms
+ GET / 200 in 21ms
+ ✓ Compiled in 993ms (2487 modules)
+ GET / 200 in 820ms
+ GET / 200 in 822ms
+ GET / 200 in 14ms
+ GET / 200 in 16ms
+ ✓ Compiled in 946ms (2487 modules)
+ GET / 200 in 779ms
+ GET / 200 in 781ms
+ GET / 200 in 23ms
+ GET / 200 in 23ms
+ ✓ Compiled in 799ms (2487 modules)
+ GET / 200 in 747ms
+ GET / 200 in 749ms
+ GET / 200 in 30ms
+ GET / 200 in 32ms
+ ✓ Compiled in 511ms (1066 modules)
+ GET / 200 in 54ms
+ GET / 200 in 8ms
+ ✓ Compiled in 309ms (1066 modules)
+ GET / 200 in 32ms
+ GET / 200 in 34ms
+ ✓ Compiled in 1106ms (2487 modules)
+ GET / 200 in 838ms
+ GET / 200 in 837ms
+ GET / 200 in 14ms
+ GET / 200 in 14ms
+ ✓ Compiled in 413ms (1066 modules)
+ GET / 200 in 23ms
+ GET / 200 in 23ms
+ ✓ Compiled in 161ms (1066 modules)
+ GET / 200 in 17ms
+ GET / 200 in 18ms
+ ✓ Compiled in 343ms (1066 modules)
+ GET / 200 in 22ms
+ GET / 200 in 21ms
+ ✓ Compiled in 273ms (1066 modules)
+ GET / 200 in 21ms
+ GET / 200 in 19ms
+ ✓ Compiled in 1248ms (2487 modules)
+ GET / 200 in 1077ms
+ GET / 200 in 1077ms
+ GET / 200 in 11ms
+ GET / 200 in 12ms
+ ✓ Compiled in 354ms (1066 modules)
+ GET / 200 in 22ms
+ GET / 200 in 29ms
+ ✓ Compiled in 324ms (1066 modules)
+ GET / 200 in 28ms
+ GET / 200 in 28ms
+ ✓ Compiled in 290ms (1066 modules)
+ GET / 200 in 19ms
+ GET / 200 in 22ms
+ ✓ Compiled in 357ms (1066 modules)
+ GET / 200 in 33ms
+ GET / 200 in 32ms
+ ✓ Compiled in 370ms (1066 modules)
+ GET / 200 in 43ms
+ GET / 200 in 44ms
+ ✓ Compiled in 391ms (1066 modules)
+ GET / 200 in 24ms
+ GET / 200 in 26ms
+ ✓ Compiled in 984ms (2487 modules)
+ GET / 200 in 761ms
+ GET / 200 in 764ms
+ GET / 200 in 15ms
+ GET / 200 in 14ms
+ ✓ Compiled in 282ms (1066 modules)
+ GET / 200 in 32ms
+ GET / 200 in 34ms
+ ✓ Compiled in 292ms (1066 modules)
+ GET / 200 in 26ms
+ GET / 200 in 27ms
+ ✓ Compiled in 175ms (1066 modules)
+ GET / 200 in 21ms
+ GET / 200 in 22ms
+ ✓ Compiled in 354ms (1066 modules)
+ GET / 200 in 34ms
+ GET / 200 in 32ms
+ ✓ Compiled in 368ms (1066 modules)
+ GET / 200 in 47ms
+ GET / 200 in 48ms
+ ✓ Compiled in 645ms (2263 modules)
+ ✓ Compiled in 382ms (1066 modules)
+ GET / 200 in 94ms
+ GET / 200 in 93ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ✓ Compiled in 164ms (1066 modules)
+ GET / 200 in 13ms
+ GET / 200 in 7ms
+ ✓ Compiled in 991ms (2277 modules)
+ GET / 200 in 52ms
+ GET / 200 in 53ms
+ ✓ Compiled in 664ms (2279 modules)
+ GET / 200 in 53ms
+ GET / 200 in 53ms
+ ✓ Compiled in 283ms (2279 modules)
+ GET / 200 in 44ms
+ GET / 200 in 43ms
+ ⨯ ./src/components/ui/query-cap-indicator.tsx:5:1
+Module not found: Can't resolve '@/components/ui/badge'
+  3 | import React from 'react';
+  4 | import { Progress } from '@/components/ui/progress';
+> 5 | import { Badge } from '@/components/ui/badge';
+    | ^
+  6 | import { Button } from '@/components/ui/button';
+  7 | import { Card, CardContent } from '@/components/ui/card';
+  8 | import { 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/components/chat/ChatInterface.tsx
+./src/app/watch/[id]/page.tsx
+ ✓ Compiled in 508ms (2297 modules)
+ GET / 200 in 52ms
+ GET / 200 in 51ms
+ ✓ Compiled in 1364ms (2507 modules)
+ GET / 200 in 840ms
+ GET / 200 in 842ms
+ GET / 200 in 18ms
+ GET / 200 in 15ms
+ GET / 200 in 256ms
+ ○ Compiling /api/user/sync ...
+ ✓ Compiled /api/user/sync in 998ms (1384 modules)
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+ GET / 200 in 51ms
+ GET / 200 in 53ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 2524ms
+ GET / 200 in 74ms
+ GET / 200 in 12ms
+ GET / 200 in 12ms
+ GET / 200 in 179ms
+ ✓ Compiled in 485ms (1076 modules)
+ GET / 200 in 151ms
+ GET / 200 in 158ms
+ ✓ Compiled in 360ms (1076 modules)
+ GET / 200 in 46ms
+ GET / 200 in 57ms
+ GET / 200 in 45ms
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1618ms
+ ✓ Compiled in 335ms (1076 modules)
+ GET / 200 in 19ms
+ GET / 200 in 20ms
+ ✓ Compiled in 284ms (1076 modules)
+ GET / 200 in 34ms
+ GET / 200 in 32ms
+ ✓ Compiled in 731ms (2446 modules)
+ ✓ Compiled in 347ms (1076 modules)
+ GET / 200 in 117ms
+ GET / 200 in 117ms
+ ✓ Compiled in 195ms (1076 modules)
+ GET / 200 in 17ms
+ GET / 200 in 19ms
+ ✓ Compiled in 160ms (1076 modules)
+ GET / 200 in 27ms
+ GET / 200 in 27ms
+ ✓ Compiled in 285ms (1076 modules)
+ GET / 200 in 22ms
+ GET / 200 in 21ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ✓ Compiled in 444ms (1076 modules)
+ GET / 200 in 34ms
+ GET / 200 in 34ms
+ GET / 200 in 94ms
+ GET / 200 in 94ms
+ ✓ Compiled in 1313ms (2507 modules)
+ GET / 200 in 190ms
+ GET / 200 in 190ms
+ ✓ Compiled in 466ms (1076 modules)
+ GET / 200 in 61ms
+ GET / 200 in 65ms
+ ✓ Compiled in 743ms (2297 modules)
+ GET / 200 in 68ms
+ GET / 200 in 10ms
+ ✓ Compiled in 1258ms (2454 modules)
+ GET / 200 in 86ms
+ GET / 200 in 86ms
+ GET / 200 in 241ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1023ms (2454 modules)
+ GET / 200 in 684ms
+ GET / 200 in 691ms
+ GET / 200 in 61ms
+ ✓ Compiled in 565ms (2454 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 226ms
+ GET / 200 in 209ms
+ ○ Compiling /_not-found ...
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 404 in 542ms
+ ✓ Compiled /_not-found in 884ms (2444 modules)
+ GET / 200 in 604ms
+ GET / 200 in 603ms
+ GET /_next/static/css/app/layout.css?v=1752230335193 404 in 56ms
+ GET /_next/static/css/app/layout.css?v=1752230335192 404 in 191ms
+ GET /_next/static/chunks/app/layout.js 404 in 235ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 235ms
+ GET /_next/static/chunks/main-app.js?v=1752230335192 404 in 237ms
+ GET /_next/static/chunks/app/page.js 404 in 236ms
+ GET /_next/static/chunks/main-app.js?v=1752230335193 404 in 195ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 43ms
+ GET /_next/static/chunks/app/layout.js 404 in 40ms
+ GET /_next/static/chunks/app/page.js 404 in 18ms
+ ✓ Compiled in 1212ms (2454 modules)
+   Reload env: .env
+ ✓ Compiled in 488ms (2664 modules)
+ ✓ Compiled in 1424ms (2454 modules)
+ ✓ Compiled in 804ms (1139 modules)
+ ✓ Compiled in 1669ms (2664 modules)
+ ✓ Compiled in 481ms (1139 modules)
+ ✓ Compiled in 527ms (1139 modules)
+ ✓ Compiled in 382ms (1139 modules)
+ ✓ Compiled in 448ms (1139 modules)
+ ✓ Compiled in 464ms (1139 modules)
+ ✓ Compiled in 414ms (1139 modules)
+ ✓ Compiled in 1759ms (2664 modules)
+ ✓ Compiled in 826ms (1139 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 1536ms (2454 modules)
+ ✓ Compiled in 506ms (1139 modules)
+ ✓ Compiled in 554ms (1139 modules)
+ ✓ Compiled in 460ms (1139 modules)
+ ✓ Compiled in 427ms (1139 modules)
+ ✓ Compiled in 316ms (1139 modules)
+ ✓ Compiled in 480ms (1139 modules)
+ ✓ Compiled in 447ms (1139 modules)
+[?25h

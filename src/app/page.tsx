@@ -9,14 +9,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { handleApiError } from '@/components/ui/error';
-import { extractVideoId, isValidYouTubeUrl } from '@/lib/youtube';
+import { extractVideoId, isValidYouTubeUrl, isValidYouTubeChannelUrl } from '@/lib/youtube';
 import { AuthStatus } from '@/components/auth/AuthGuard';
-import { SignInButton } from '@clerk/nextjs';
+import { BetaMessaging } from '@/components/messaging/BetaMessaging';
+import { ChannelDropdown } from '@/components/channels/ChannelDropdown';
+import { useQuota } from '@/hooks/useQuota';
+import { trackEvent } from '@/lib/posthog';
+import { SignInButton, useUser } from '@clerk/nextjs';
 import { Loader2, X } from 'lucide-react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 
 export default function Home() {
   const router = useRouter();
+  const { isSignedIn } = useUser();
   const [url, setUrl] = useState('');
   const [firstQuestion, setFirstQuestion] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,6 +33,9 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const { bannerVisible, setBannerVisible, showBanner } = useBanner();
   const questionRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Real quota data
+  const { quotaUsed, quotaLimit, channelsUsed, channelLimit, userType } = useQuota();
 
   // Prevent hydration issues by only rendering animations on client
   useEffect(() => {
@@ -39,13 +48,19 @@ export default function Home() {
     setVideoPreview(null);
     
     const trimmedUrl = newUrl.trim();
-    const valid = Boolean(trimmedUrl && isValidYouTubeUrl(trimmedUrl));
+    const valid = Boolean(trimmedUrl && (isValidYouTubeUrl(trimmedUrl) || isValidYouTubeChannelUrl(trimmedUrl)));
     setIsValidUrl(valid);
     
     if (valid) {
+      // Track video URL pasted
+      const videoId = extractVideoId(trimmedUrl);
+      trackEvent('video_url_pasted', {
+        video_id: videoId || undefined, // Convert null to undefined to satisfy TypeScript
+        url: trimmedUrl
+      });
+
       // Fetch video preview and start pre-processing
       try {
-        const videoId = extractVideoId(trimmedUrl);
         if (videoId) {
           // Fetch video preview
           const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
@@ -116,14 +131,11 @@ export default function Home() {
       return;
     }
 
-    if (!isValidYouTubeUrl(url)) {
-      setError('Please enter a valid YouTube URL');
-      return;
-    }
+    const isVideo = isValidYouTubeUrl(url);
+    const isChannel = isValidYouTubeChannelUrl(url);
 
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-      setError('Please enter a valid YouTube URL');
+    if (!isVideo && !isChannel) {
+      setError('Please enter a valid YouTube video or channel URL');
       return;
     }
 
@@ -131,23 +143,50 @@ export default function Home() {
     setError(null);
 
     try {
-      // Navigate to watch page with the video ID
-      const watchUrl = firstQuestion.trim() 
-        ? `/watch/${videoId}?q=${encodeURIComponent(firstQuestion.trim())}`
-        : `/watch/${videoId}`;
-      
-      console.log('Navigating to:', watchUrl, 'with question:', firstQuestion);
-      router.push(watchUrl);
+      // Handle channel URLs differently
+      if (isChannel && !isVideo) {
+        // Process channel
+        const response = await fetch('/api/channel/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channelUrl: url }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          toast.success(`Channel "${data.channel.title}" queued for processing. You'll receive an email when it's ready.`);
+          router.push('/dashboard');
+        } else {
+          setError(data.error || 'Failed to process channel');
+        }
+      } else {
+        // Process video (existing logic)
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+          setError('Please enter a valid YouTube URL');
+          return;
+        }
+
+        // Navigate to watch page with the video ID
+        const watchUrl = firstQuestion.trim() 
+          ? `/watch/${videoId}?q=${encodeURIComponent(firstQuestion.trim())}`
+          : `/watch/${videoId}`;
+        
+        console.log('Navigating to:', watchUrl, 'with question:', firstQuestion);
+        router.push(watchUrl);
+      }
     } catch (error) {
-      console.error('Navigation error:', error);
+      console.error('Processing error:', error);
       setError(handleApiError(error));
+    } finally {
       setIsProcessing(false);
     }
   };
 
   const handleStartChatWithQuestion = async (question: string) => {
-    if (!isValidYouTubeUrl(url)) {
-      setError('Please enter a valid YouTube URL');
+    if (!isValidYouTubeUrl(url) && !isValidYouTubeChannelUrl(url)) {
+      setError('Please enter a valid YouTube video or channel URL');
       return;
     }
 
@@ -296,6 +335,15 @@ export default function Home() {
             <AuthStatus />
           </div>
         </div>
+
+        {/* Beta Messaging */}
+        <BetaMessaging 
+          quotaUsed={quotaUsed}
+          quotaLimit={quotaLimit}
+          channelsUsed={channelsUsed}
+          channelLimit={channelLimit}
+          userType={userType}
+        />
         
         <Card>
           <CardHeader>
@@ -304,11 +352,11 @@ export default function Home() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="youtube-url" className="text-sm font-medium">
-                Paste YouTube Link
+                Paste YouTube Link (Video or Channel)
               </label>
               <Input
                 id="youtube-url"
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/@channel"
                 type="url"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
@@ -318,70 +366,78 @@ export default function Home() {
               />
             </div>
             
-            <div className="space-y-2">
-              <label htmlFor="first-question" className="text-sm font-medium">
-                Ask Your First Question (Optional)
-              </label>
-              <Textarea
-                ref={questionRef}
-                id="first-question"
-                placeholder="Ask me anything about this video"
-                value={firstQuestion}
-                onChange={(e) => setFirstQuestion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleStartChat();
-                  }
-                }}
-                disabled={isProcessing}
-                rows={3}
-              />
-              
-              {isValidUrl && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const question = 'Summarize this video';
-                      setFirstQuestion(question);
-                      handleStartChatWithQuestion(question);
-                    }}
-                    disabled={isProcessing}
-                    className="text-xs"
-                  >
-                    Summarize this video
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const question = 'Give me the key takeaways';
-                      setFirstQuestion(question);
-                      handleStartChatWithQuestion(question);
-                    }}
-                    disabled={isProcessing}
-                    className="text-xs"
-                  >
-                    Key takeaways
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const question = 'Explain the main points';
-                      setFirstQuestion(question);
-                      handleStartChatWithQuestion(question);
-                    }}
-                    disabled={isProcessing}
-                    className="text-xs"
-                  >
-                    Main points
-                  </Button>
-                </div>
-              )}
-            </div>
+            {/* Only show question input for video URLs, not channel URLs */}
+            {(!isValidYouTubeChannelUrl(url) || isValidYouTubeUrl(url)) && (
+              <div className="space-y-2">
+                <label htmlFor="first-question" className="text-sm font-medium">
+                  Ask Your First Question (Optional)
+                </label>
+                <Textarea
+                  ref={questionRef}
+                  id="first-question"
+                  placeholder="Ask me anything about this video"
+                  value={firstQuestion}
+                  onChange={(e) => setFirstQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleStartChat();
+                    }
+                  }}
+                  disabled={isProcessing}
+                  rows={3}
+                />
+                
+                {isValidUrl && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const question = 'Summarize this video';
+                        setFirstQuestion(question);
+                        handleStartChatWithQuestion(question);
+                      }}
+                      disabled={isProcessing}
+                      className="text-xs"
+                    >
+                      Summarize this video
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const question = 'Give me the key takeaways';
+                        setFirstQuestion(question);
+                        handleStartChatWithQuestion(question);
+                      }}
+                      disabled={isProcessing}
+                      className="text-xs"
+                    >
+                      Key takeaways
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const question = 'Explain the main points';
+                        setFirstQuestion(question);
+                        handleStartChatWithQuestion(question);
+                      }}
+                      disabled={isProcessing}
+                      className="text-xs"
+                    >
+                      Main points
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Channel dropdown for signed-in users */}
+            {isSignedIn && (
+              <ChannelDropdown />
+            )}
 
             {error && (
               <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
@@ -422,19 +478,38 @@ export default function Home() {
                 </>
               ) : videoPreview ? (
                 'Start Chatting'
+              ) : isValidYouTubeChannelUrl(url) && !isValidYouTubeUrl(url) ? (
+                'Index Channel'
               ) : (
                 'Start Chatting'
               )}
             </Button>
             
             <div className="text-center space-y-3">
-              <div className="flex justify-center">
-                <SignInButton mode="modal">
-                  <Button variant="secondary" size="sm" className="text-sm">
-                    Sign in to search channels & save chats
+              {/* Sign in button - only for non-signed-in users */}
+              {!isSignedIn && (
+                <div className="flex justify-center">
+                  <SignInButton mode="modal">
+                    <Button variant="secondary" size="sm" className="text-sm">
+                      Sign in to search channels & save chats
+                    </Button>
+                  </SignInButton>
+                </div>
+              )}
+
+              {/* Channels section - only for signed-in users */}
+              {isSignedIn && (
+                <div className="flex justify-center">
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="text-sm"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    Manage Channels & History
                   </Button>
-                </SignInButton>
-              </div>
+                </div>
+              )}
               
               <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
                 <span>Need a video to try?</span>

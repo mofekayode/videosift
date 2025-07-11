@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateChatResponse, extractCitations } from '@/lib/openai';
 import { getVideoTranscript, createChatSession, saveChatMessage, getChatMessageCount } from '@/lib/database';
 import { auth } from '@clerk/nextjs/server';
+import { ensureUserExists } from '@/lib/user-sync';
+import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
+import { trackApiError, trackRateLimitError, trackExternalServiceError } from '@/lib/error-tracking';
+import { logger, LogCategory, logApiRequest } from '@/lib/logger';
+import { CacheUtils } from '@/lib/cache';
 
 // Chat session limits
 const CHAT_LIMITS = {
@@ -12,10 +17,24 @@ const CHAT_LIMITS = {
 };
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const clientIP = getClientIP(request);
+  let httpStatus = 200;
+  
   try {
+    logger.info(LogCategory.API, 'Chat request started', {
+      apiEndpoint: '/api/chat-simple',
+      ipAddress: clientIP
+    });
+    
     const { query, videoId, messages = [], sessionId, anonId } = await request.json();
     
     if (!query) {
+      httpStatus = 400;
+      trackApiError('Missing query parameter', {
+        apiEndpoint: '/api/chat-simple',
+        ipAddress: clientIP
+      });
       return NextResponse.json(
         { error: 'Query is required' },
         { status: 400 }
@@ -23,6 +42,11 @@ export async function POST(request: NextRequest) {
     }
     
     if (!videoId) {
+      httpStatus = 400;
+      trackApiError('Missing videoId parameter', {
+        apiEndpoint: '/api/chat-simple',
+        ipAddress: clientIP
+      });
       return NextResponse.json(
         { error: 'Video ID is required' },
         { status: 400 }
@@ -32,12 +56,83 @@ export async function POST(request: NextRequest) {
     // Get user authentication
     const { userId } = await auth();
     
+    // Get the Supabase user if authenticated
+    let supabaseUserId = null;
+    if (userId) {
+      const user = await ensureUserExists();
+      if (user) {
+        supabaseUserId = user.id;
+      }
+    }
+    
+    // Rate limiting check
+    const identifier = userId || getClientIP(request);
+    const tier = getUserTier(userId);
+    
+    // Check both hourly and daily limits
+    const [hourlyLimit, dailyLimit] = await Promise.all([
+      checkRateLimit(identifier, 'chat', tier, 'hour'),
+      checkRateLimit(identifier, 'chat', tier, 'day')
+    ]);
+    
+    if (!hourlyLimit.allowed) {
+      httpStatus = 429;
+      trackRateLimitError(`Hourly rate limit exceeded for ${tier} user`, {
+        userId,
+        apiEndpoint: '/api/chat-simple',
+        ipAddress: clientIP,
+        additionalData: { limit: hourlyLimit.limit, remaining: hourlyLimit.remaining }
+      });
+      return NextResponse.json({
+        error: `Hourly chat limit exceeded. You can send ${hourlyLimit.limit} messages per hour.`,
+        rateLimited: true,
+        limit: hourlyLimit.limit,
+        remaining: hourlyLimit.remaining,
+        resetTime: hourlyLimit.resetTime,
+        retryAfter: hourlyLimit.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': hourlyLimit.retryAfter?.toString() || '3600',
+          'X-RateLimit-Limit': hourlyLimit.limit.toString(),
+          'X-RateLimit-Remaining': hourlyLimit.remaining.toString(),
+          'X-RateLimit-Reset': Math.floor(hourlyLimit.resetTime.getTime() / 1000).toString()
+        }
+      });
+    }
+    
+    if (!dailyLimit.allowed) {
+      httpStatus = 429;
+      trackRateLimitError(`Daily rate limit exceeded for ${tier} user`, {
+        userId,
+        apiEndpoint: '/api/chat-simple',
+        ipAddress: clientIP,
+        additionalData: { limit: dailyLimit.limit, remaining: dailyLimit.remaining }
+      });
+      return NextResponse.json({
+        error: `Daily chat limit exceeded. You can send ${dailyLimit.limit} messages per day.`,
+        rateLimited: true,
+        limit: dailyLimit.limit,
+        remaining: dailyLimit.remaining,
+        resetTime: dailyLimit.resetTime,
+        retryAfter: dailyLimit.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': dailyLimit.retryAfter?.toString() || '86400',
+          'X-RateLimit-Limit': dailyLimit.limit.toString(),
+          'X-RateLimit-Remaining': dailyLimit.remaining.toString(),
+          'X-RateLimit-Reset': Math.floor(dailyLimit.resetTime.getTime() / 1000).toString()
+        }
+      });
+    }
+    
     // Handle chat session
     let currentSessionId = sessionId;
     if (!currentSessionId) {
       // Try to create new session, but don't fail if it doesn't work
       try {
-        const session = await createChatSession(videoId, userId || undefined, anonId);
+        const session = await createChatSession(supabaseUserId || undefined, anonId, undefined, [videoId]);
         if (session) {
           currentSessionId = session.id;
         } else {
@@ -80,6 +175,34 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Check cache for similar query
+    const cachedResult = await CacheUtils.getCachedTranscriptSearch(videoId, query);
+    if (cachedResult) {
+      console.log('🚀 Found cached transcript search result');
+      
+      // Still need to increment rate limit for cached responses
+      await Promise.all([
+        incrementRateLimit(identifier, 'chat', 'hour'),
+        incrementRateLimit(identifier, 'chat', 'day')
+      ]);
+      
+      // Save to session if needed
+      try {
+        if (!currentSessionId.startsWith('temp_')) {
+          await saveChatMessage(currentSessionId, 'user', query);
+          await saveChatMessage(currentSessionId, 'assistant', cachedResult.response, cachedResult.citations);
+        }
+      } catch (error) {
+        console.log('⚠️ Failed to save cached messages:', error);
+      }
+      
+      return NextResponse.json({
+        ...cachedResult,
+        cached: true,
+        sessionId: currentSessionId
+      });
+    }
+
     // Get all transcript chunks for this video (no embedding search needed)
     const chunks = await getVideoTranscript(videoId);
     
@@ -122,6 +245,12 @@ export async function POST(request: NextRequest) {
     // Extract citations from response
     const citations = extractCitations(response);
     
+    // Increment rate limit counters for successful chat
+    await Promise.all([
+      incrementRateLimit(identifier, 'chat', 'hour'),
+      incrementRateLimit(identifier, 'chat', 'day')
+    ]);
+    
     // Save messages to database (optional, will fail silently if tables don't exist)
     try {
       if (!currentSessionId.startsWith('temp_')) {
@@ -150,7 +279,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    // Get updated rate limit info for response headers
+    const updatedHourlyLimit = await checkRateLimit(identifier, 'chat', tier, 'hour');
+    const updatedDailyLimit = await checkRateLimit(identifier, 'chat', tier, 'day');
+    
+    const responseData = {
       success: true,
       response,
       citations: citations.map(citation => ({
@@ -160,15 +293,73 @@ export async function POST(request: NextRequest) {
       })),
       chunks_used: chunks.length,
       sessionId: currentSessionId,
-      sessionInfo
+      sessionInfo,
+      rateLimit: {
+        hourly: {
+          limit: updatedHourlyLimit.limit,
+          remaining: updatedHourlyLimit.remaining,
+          resetTime: updatedHourlyLimit.resetTime
+        },
+        daily: {
+          limit: updatedDailyLimit.limit,
+          remaining: updatedDailyLimit.remaining,
+          resetTime: updatedDailyLimit.resetTime
+        }
+      }
+    };
+    
+    // Cache the result for similar future queries
+    try {
+      await CacheUtils.cacheTranscriptSearch(videoId, query, {
+        success: true,
+        response,
+        citations: responseData.citations,
+        chunks_used: chunks.length
+      });
+      console.log('💾 Cached transcript search result');
+    } catch (error) {
+      console.log('⚠️ Failed to cache result:', error);
+    }
+    
+    return NextResponse.json(responseData, {
+      headers: {
+        'X-RateLimit-Limit-Hourly': updatedHourlyLimit.limit.toString(),
+        'X-RateLimit-Remaining-Hourly': updatedHourlyLimit.remaining.toString(),
+        'X-RateLimit-Reset-Hourly': Math.floor(updatedHourlyLimit.resetTime.getTime() / 1000).toString(),
+        'X-RateLimit-Limit-Daily': updatedDailyLimit.limit.toString(),
+        'X-RateLimit-Remaining-Daily': updatedDailyLimit.remaining.toString(),
+        'X-RateLimit-Reset-Daily': Math.floor(updatedDailyLimit.resetTime.getTime() / 1000).toString()
+      }
     });
     
   } catch (error) {
-    console.error('Simple chat API error:', error);
+    httpStatus = 500;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    trackApiError('Chat API internal error', {
+      userId,
+      apiEndpoint: '/api/chat-simple',
+      ipAddress: clientIP,
+      additionalData: { error: errorMessage }
+    });
+    
+    logger.error(LogCategory.API, 'Simple chat API error', {
+      userId,
+      apiEndpoint: '/api/chat-simple',
+      ipAddress: clientIP
+    }, error as Error);
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  } finally {
+    // Log API request completion
+    const duration = Date.now() - startTime;
+    logApiRequest('POST', '/api/chat-simple', httpStatus, duration, {
+      userId,
+      ipAddress: clientIP
+    });
   }
 }
 

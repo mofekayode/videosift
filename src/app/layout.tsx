@@ -4,6 +4,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { BannerProvider } from "@/contexts/BannerContext";
 import { DynamicHeader } from "@/components/layout/DynamicHeader";
+import { PostHogProvider } from "@/components/analytics/PostHogProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,10 +38,14 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ThemeProvider defaultTheme="dark">
-            <BannerProvider>
-              <DynamicHeader />
-              {children}
-            </BannerProvider>
+            <PostHogProvider>
+              <BannerProvider>
+                <ErrorBoundary>
+                  <DynamicHeader />
+                  {children}
+                </ErrorBoundary>
+              </BannerProvider>
+            </PostHogProvider>
           </ThemeProvider>
         </body>
       </html>

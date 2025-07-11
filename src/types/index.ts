@@ -23,7 +23,11 @@ export interface Channel {
   youtube_channel_id: string;
   title: string;
   owner_user_id: string;
-  status: 'pending' | 'processing' | 'ready' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  video_count?: number;
+  last_indexed_at?: string;
+  assistant_id?: string;
+  vector_store_id?: string;
   created_at: string;
 }
 
@@ -51,7 +55,9 @@ export interface ChannelQueue {
 // Chat session types
 export interface ChatSession {
   id: string;
-  video_id: string;
+  video_id?: string;  // For single video chats
+  video_ids?: string; // JSON string for multi-video chats
+  channel_id?: string; // For channel chats
   user_id?: string;  // null for anonymous users
   anon_id?: string;  // anonymous session identifier
   created_at: string;

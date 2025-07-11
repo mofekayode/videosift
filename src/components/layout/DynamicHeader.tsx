@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { RoadmapModal } from "@/components/roadmap/RoadmapModal";
 import { useBanner } from "@/contexts/BannerContext";
 import Link from "next/link";
 import Image from "next/image";
@@ -48,6 +49,7 @@ export function DynamicHeader() {
       <header className={`fixed right-0 p-2 sm:p-4 flex gap-2 items-center z-[9999] bg-background/80 backdrop-blur-sm rounded-bl-lg transition-all duration-300 ${
         bannerVisible && showBanner ? 'top-12' : 'top-2'
       }`}>
+        <RoadmapModal />
         <ThemeToggle />
         <SignedOut>
           <SignInButton mode="modal">

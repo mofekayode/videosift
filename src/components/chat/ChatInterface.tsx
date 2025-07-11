@@ -13,6 +13,8 @@ import { ChatMessage } from '@/types';
 import { generateAnonId, getStoredAnonId, setStoredAnonId } from '@/lib/session';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { QueryCapIndicator } from '@/components/ui/query-cap-indicator';
+import { useRateLimit } from '@/hooks/useRateLimit';
 
 interface ChatInterfaceProps {
   videoId?: string;
@@ -37,7 +39,8 @@ export function ChatInterface({
   initialQuestion,
   onCitationsUpdate
 }: ChatInterfaceProps) {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
+  const { rateLimitData, updateFromResponse } = useRateLimit();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -172,6 +175,9 @@ export function ChatInterface({
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId);
       }
+
+      // Update rate limit data from response
+      updateFromResponse(data);
 
       // Update session info if provided
       if (data.sessionInfo) {
@@ -404,6 +410,32 @@ export function ChatInterface({
                 Save Chat
               </Button>
             </SignUpButton>
+          </div>
+        </div>
+      )}
+
+      {/* Rate Limit Indicator */}
+      {rateLimitData && (
+        <div className="px-4 py-2 border-t bg-muted/20">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-3">
+              <QueryCapIndicator
+                used={rateLimitData.hourly.limit - rateLimitData.hourly.remaining}
+                limit={rateLimitData.hourly.limit}
+                timeframe="hour"
+                resetTime={rateLimitData.hourly.resetTime}
+                tier={user ? 'user' : 'anonymous'}
+                compact={true}
+              />
+              <QueryCapIndicator
+                used={rateLimitData.daily.limit - rateLimitData.daily.remaining}
+                limit={rateLimitData.daily.limit}
+                timeframe="day"
+                resetTime={rateLimitData.daily.resetTime}
+                tier={user ? 'user' : 'anonymous'}
+                compact={true}
+              />
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getVideoMetadata } from '@/services/youtube';
 import { extractVideoId } from '@/lib/youtube';
 import { createVideo, getVideoByYouTubeId } from '@/lib/database';
+import { CacheUtils } from '@/lib/cache';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,25 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Check cache first
+    const cachedMetadata = await CacheUtils.getCachedVideoMetadata(videoId);
+    if (cachedMetadata) {
+      console.log('🚀 Found cached metadata');
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        data: {
+          video: cachedMetadata.video,
+          metadata: {
+            youtube_id: cachedMetadata.video.youtube_id,
+            title: cachedMetadata.video.title,
+            duration: cachedMetadata.video.duration,
+            thumbnail_url: cachedMetadata.video.thumbnail_url
+          }
+        }
+      });
+    }
+
     // Check if video already exists in database
     let video = await getVideoByYouTubeId(videoId);
     console.log('🗃️ Video in database:', video ? 'Found' : 'Not found');
@@ -63,17 +83,24 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Cache the result for future requests
+    const resultData = {
+      video,
+      metadata: {
+        youtube_id: video.youtube_id,
+        title: video.title,
+        duration: video.duration,
+        thumbnail_url: video.thumbnail_url
+      }
+    };
+    
+    await CacheUtils.cacheVideoMetadata(videoId, resultData);
+    console.log('💾 Cached video metadata');
+    
     return NextResponse.json({
       success: true,
-      data: {
-        video,
-        metadata: {
-          youtube_id: video.youtube_id,
-          title: video.title,
-          duration: video.duration,
-          thumbnail_url: video.thumbnail_url
-        }
-      }
+      cached: false,
+      data: resultData
     });
   } catch (error) {
     console.error('Video metadata API error:', error);

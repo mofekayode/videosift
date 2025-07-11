@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { createChannel, queueChannel } from '@/lib/database';
+import { createChannel, queueChannel, getUserByClerkId } from '@/lib/database';
 import { extractChannelId } from '@/lib/youtube';
+import { ensureUserExists } from '@/lib/user-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Ensure user exists in Supabase and get the Supabase user record
+    const user = await ensureUserExists();
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Failed to sync user data' },
+        { status: 500 }
       );
     }
 
@@ -27,14 +37,17 @@ export async function POST(request: NextRequest) {
 
     // Extract channel identifier from URL
     const channelIdentifier = extractChannelId(channelUrl);
+    console.log('🔍 Extracted channel identifier:', channelIdentifier);
+    
     if (!channelIdentifier) {
+      console.error('❌ Failed to extract channel ID from URL:', channelUrl);
       return NextResponse.json(
-        { error: 'Invalid YouTube channel URL' },
+        { error: 'Invalid YouTube channel URL. Please use a format like youtube.com/@channelname or youtube.com/channel/UCxxxxx' },
         { status: 400 }
       );
     }
 
-    console.log('🔍 Channel identifier:', channelIdentifier);
+    console.log('✅ Channel identifier:', channelIdentifier);
 
     // Check if it's a direct channel ID or needs resolution
     let actualChannelId = channelIdentifier;
@@ -92,7 +105,7 @@ export async function POST(request: NextRequest) {
     const channel = await createChannel({
       youtube_channel_id: actualChannelId,
       title: channelData.snippet.title,
-      owner_user_id: userId,
+      owner_user_id: user.id,  // Use the Supabase user ID (UUID) instead of Clerk ID
       status: 'pending'
     });
 
@@ -104,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Queue the channel for processing
-    const queueItem = await queueChannel(channel.id, userId);
+    const queueItem = await queueChannel(channel.id, user.id);
     
     if (!queueItem) {
       return NextResponse.json(

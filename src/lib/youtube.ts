@@ -54,9 +54,9 @@ export function parseTimestamp(timestamp: string): number {
 export function isValidYouTubeChannelUrl(url: string): boolean {
   const patterns = [
     /^https?:\/\/(www\.)?youtube\.com\/channel\/([a-zA-Z0-9_-]+)/,
-    /^https?:\/\/(www\.)?youtube\.com\/c\/([a-zA-Z0-9_-]+)/,
-    /^https?:\/\/(www\.)?youtube\.com\/user\/([a-zA-Z0-9_-]+)/,
-    /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9_-]+)/
+    /^https?:\/\/(www\.)?youtube\.com\/c\/([a-zA-Z0-9._-]+)/,
+    /^https?:\/\/(www\.)?youtube\.com\/user\/([a-zA-Z0-9._-]+)/,
+    /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9._-]+)/
   ];
   
   return patterns.some(pattern => pattern.test(url));
@@ -69,11 +69,22 @@ export function extractChannelId(url: string): string | null {
     return channelMatch[1];
   }
   
-  // For other formats (custom URLs, @handles), we'll need to resolve them
-  // via YouTube API in the processing endpoint
-  const customMatch = url.match(/youtube\.com\/(c|user|@)\/([a-zA-Z0-9_-]+)/);
+  // Handle @username format (more flexible pattern)
+  const atMatch = url.match(/youtube\.com\/@([a-zA-Z0-9._-]+)/);
+  if (atMatch) {
+    return atMatch[1];
+  }
+  
+  // Handle /c/ custom URL format
+  const customMatch = url.match(/youtube\.com\/c\/([a-zA-Z0-9._-]+)/);
   if (customMatch) {
-    return customMatch[2]; // Return the handle/username for API resolution
+    return customMatch[1];
+  }
+  
+  // Handle /user/ format
+  const userMatch = url.match(/youtube\.com\/user\/([a-zA-Z0-9._-]+)/);
+  if (userMatch) {
+    return userMatch[1];
   }
   
   return null;

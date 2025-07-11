@@ -9,6 +9,12 @@ export async function POST(request: NextRequest) {
     
     console.log('🔄 Processing channel queue...');
     
+    // Check if supabaseAdmin is available (it will be null in environments without the service role key)
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase admin client not available - skipping channel queue processing');
+      return NextResponse.json({ message: 'Supabase admin client not available', error: 'Missing service role key' }, { status: 503 });
+    }
+    
     // Get pending channel queue items with user data
     const { data: queueItems, error: queueError } = await supabaseAdmin
       .from('channel_queue')
@@ -222,6 +228,15 @@ async function processChannelVideos(channel: any): Promise<{
   error?: string 
 }> {
   try {
+    // Check if supabaseAdmin is available
+    if (!supabaseAdmin) {
+      console.log('⚠️ Supabase admin client not available - cannot process channel videos');
+      return {
+        success: false,
+        videosProcessed: 0,
+        error: 'Supabase admin client not available - missing service role key'
+      };
+    }
     const channelId = channel.youtube_channel_id;
     console.log(`📺 Fetching videos for channel: ${channelId}`);
     
@@ -311,10 +326,14 @@ async function fetchAllChannelVideos(channelId: string) {
   const videos: any[] = [];
   let nextPageToken = '';
   
+  // TEST MODE: Only fetch last 3 videos
+  const TEST_MODE = true;
+  const TEST_VIDEO_LIMIT = 3;
+  
   try {
     do {
       const url = `https://www.googleapis.com/youtube/v3/search?` +
-        `part=snippet&channelId=${channelId}&type=video&order=date&maxResults=50` +
+        `part=snippet&channelId=${channelId}&type=video&order=date&maxResults=${TEST_MODE ? TEST_VIDEO_LIMIT : 50}` +
         (nextPageToken ? `&pageToken=${nextPageToken}` : '') +
         `&key=${process.env.YOUTUBE_API_KEY}`;
       
@@ -330,15 +349,21 @@ async function fetchAllChannelVideos(channelId: string) {
       
       console.log(`📄 Fetched ${data.items?.length || 0} videos (total: ${videos.length})`);
       
+      // TEST MODE: Stop after fetching 3 videos
+      if (TEST_MODE && videos.length >= TEST_VIDEO_LIMIT) {
+        console.log(`🧪 TEST MODE: Limiting to ${TEST_VIDEO_LIMIT} videos`);
+        return videos.slice(0, TEST_VIDEO_LIMIT);
+      }
+      
       // Limit to prevent infinite loops and API quota issues
       if (videos.length >= 500) {
         console.log('⚠️  Reached video limit (500), stopping...');
         break;
       }
       
-    } while (nextPageToken);
+    } while (nextPageToken && (!TEST_MODE || videos.length < TEST_VIDEO_LIMIT));
     
-    return videos;
+    return TEST_MODE ? videos.slice(0, TEST_VIDEO_LIMIT) : videos;
     
   } catch (error) {
     console.error('❌ Error fetching channel videos:', error);
