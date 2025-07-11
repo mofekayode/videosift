@@ -48,13 +48,23 @@ export interface ChannelQueue {
   error_message?: string;
 }
 
-// Chat types
+// Chat session types
+export interface ChatSession {
+  id: string;
+  video_id: string;
+  user_id?: string;  // null for anonymous users
+  anon_id?: string;  // anonymous session identifier
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatMessage {
   id: string;
+  session_id: string;
   role: 'user' | 'assistant';
   content: string;
   citations?: Citation[];
-  timestamp: Date;
+  created_at: string;
 }
 
 export interface Citation {
@@ -62,6 +72,15 @@ export interface Citation {
   text: string;
   video_id?: string;
   video_title?: string;
+}
+
+// Client-side chat message (with Date timestamp for compatibility)
+export interface ClientChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations?: Citation[];
+  timestamp: Date;
 }
 
 // API types
@@ -84,7 +103,9 @@ export interface TranscriptSegment {
 export interface ChatRequest {
   video_id?: string;
   channel_id?: string;
-  messages: ChatMessage[];
+  session_id?: string;
+  anon_id?: string;
+  messages: ClientChatMessage[];
   query: string;
 }
 

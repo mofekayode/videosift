@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { ensureUserExists } from '@/lib/user-sync';
+import { migrateAnonSessionToUser } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get request body for anonId
+    const body = await request.json().catch(() => ({}));
+    const { anonId } = body;
+
     console.log('🔄 Syncing user:', userId);
     const user = await ensureUserExists();
     
@@ -23,6 +28,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Migrate anonymous sessions if anonId is provided
+    let migratedSessionsCount = 0;
+    if (anonId) {
+      console.log('🔄 Migrating anonymous sessions for anonId:', anonId);
+      migratedSessionsCount = await migrateAnonSessionToUser(anonId, userId);
+    }
+
     return NextResponse.json({
       success: true,
       user: {
@@ -30,7 +42,8 @@ export async function POST(request: NextRequest) {
         clerkId: user.clerk_id,
         email: user.email,
         createdAt: user.created_at
-      }
+      },
+      migratedSessions: migratedSessionsCount
     });
   } catch (error) {
     console.error('❌ User sync error:', error);

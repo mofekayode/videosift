@@ -46,8 +46,11 @@ export function ThemeProvider({
     const storedTheme = localStorage.getItem('theme') as Theme;
     if (storedTheme) {
       setTheme(storedTheme);
+    } else {
+      // Set default theme in localStorage if not set
+      localStorage.setItem('theme', defaultTheme);
     }
-  }, []);
+  }, [defaultTheme]);
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

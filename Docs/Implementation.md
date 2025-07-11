@@ -83,21 +83,34 @@
 **Dependencies:** Stage 2 completion
 
 #### Sub-steps
-- [ ] For signed in users we should save their chat and have a way for them to see their history
-- [ ] Dont forget to limit how much they can chat in the same session as we are loading all in context
-- [ ] Implement channel URL processing which is getting all the urls in that channel and downloading the transcripts
-- [ ] Modify the UI to allow users to add channels and have a way to see their channels in the home page
-- [ ] Modify the UI to allow users select the channels they want to chat with
-- [ ] Modify the UI to allow users to see the different videos the result is coming from. only load one video at a time and allow the timestamp citation to be clickable to load the right video at that timestamp
-- [ ] Implement background job system for channel indexing
-- [ ] Build email notification system with Resend when the channel is indexed
+- [x] Save their chat and use anon_id for guest users
+- [x] Limit how much they can chat in the same session as we are loading all in context
+- [x] For signed in users we should have a way for them to see their history convert anon_id to user_id
+- [x] Modify the UI to allow users to add channels and have a way to see their channels in the home page for signed in users
+- [x] Implement channel URL processing which is getting all the urls in that channel and downloading the transcripts
+- [x] Remove the option to type a question if they paste a channel url
+- [x] Implement background job system for channel indexing
+- [x] Build email notification system with Resend when the channel is indexed
 - [ ] Chron job to check if there are new videos in the channel and download the transcripts
+- [ ] Modify the UI to allow users select the channels they want to chat with for signed in users for now they can only chat with one channel as multi channel chat is comming soon so they can only index a channel.
+- [ ] Explore using openai assistant that allows you add files. Just have a file that contains all the video transcripts for all videos in a channel and let it do the RAG itself so instead of putting the whole video transcript in the context we can just put the file name and let the assistant do the RAG itself
+- [ ] Modify the UI to allow users to see the different videos the result is coming from. Just have a list of 
+videos and citations on the left pane similar to what we already have.
 - [ ] Implement rate limiting and quota management
 - [ ] Create user dashboard for managing channels and history
-- [ ] Add thumbnail preview system with timestamp seeking
-- [ ] Implement citation highlighting and navigation
 - [ ] Add comprehensive error tracking and logging
 - [ ] Implement caching strategies for improved performance
+- [ ] Surface a mini roadmap modal that shows “Coming soon: multi channel search, upload, enterprise” so you can brag without confusing.
+- [ ] Put a hard query cap per guest per day and show a progress ring on the chat button that counts down remaining queries. Counter pill uses accent background at ≥ 20 % and fades to warm amber under 20 %.
+Progress ring animates around the Send button as credits burn. A tiny ⓘ icon next to the counter opens a popover with the full quota table.
+- [ ] FREE BETA Ask up to 30 questions per day and index 1 YouTube channel. Pro plans launch on July 18. Early testers get 40 % off for life.
+- [ ] PRO PLAN COMING SOON You’re at 12 / 30 free questions today. Need more juice? Join the wait-list and lock lifetime pricing.
+- [ ] CHANNEL LIMIT One free channel while we’re in beta. Pro unlocks 10 channels and priority indexing (launches Jul 18).
+- [ ] Implement analytics and user behavior tracking with posthog
+
+
+
+
 
 ### Stage 4: Polish & Optimization
 **Duration:** 1-2 weeks
@@ -105,7 +118,7 @@
 
 #### Sub-steps:
 - [ ] Conduct comprehensive testing across all features
-- [ ] Optimize database queries and API performance
+- [ ] Optimize database queries and API performance if needed
 - [ ] Implement SEO optimization and meta tags
 - [ ] Add accessibility features and ARIA labels
 - [ ] Create comprehensive error handling and user feedback

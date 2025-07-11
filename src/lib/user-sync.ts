@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server';
 import { createUser, getUserByClerkId } from './database';
+import { sendWelcomeEmail } from './email';
 
 export async function ensureUserExists() {
   try {
@@ -33,6 +34,17 @@ export async function ensureUserExists() {
     
     if (newUser) {
       console.log('✅ User created successfully:', newUser.id);
+      
+      // Send welcome email for new users
+      const userName = user.firstName || user.username || primaryEmail.split('@')[0];
+      try {
+        await sendWelcomeEmail(primaryEmail, userName);
+        console.log('📧 Welcome email sent to:', primaryEmail);
+      } catch (emailError) {
+        console.error('❌ Failed to send welcome email:', emailError);
+        // Don't fail user creation if email fails
+      }
+      
       return newUser;
     } else {
       console.error('❌ Failed to create user in Supabase');

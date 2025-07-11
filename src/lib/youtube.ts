@@ -50,3 +50,31 @@ export function parseTimestamp(timestamp: string): number {
   
   return 0;
 }
+
+export function isValidYouTubeChannelUrl(url: string): boolean {
+  const patterns = [
+    /^https?:\/\/(www\.)?youtube\.com\/channel\/([a-zA-Z0-9_-]+)/,
+    /^https?:\/\/(www\.)?youtube\.com\/c\/([a-zA-Z0-9_-]+)/,
+    /^https?:\/\/(www\.)?youtube\.com\/user\/([a-zA-Z0-9_-]+)/,
+    /^https?:\/\/(www\.)?youtube\.com\/@([a-zA-Z0-9_-]+)/
+  ];
+  
+  return patterns.some(pattern => pattern.test(url));
+}
+
+export function extractChannelId(url: string): string | null {
+  // Handle direct channel ID format
+  const channelMatch = url.match(/youtube\.com\/channel\/([a-zA-Z0-9_-]+)/);
+  if (channelMatch) {
+    return channelMatch[1];
+  }
+  
+  // For other formats (custom URLs, @handles), we'll need to resolve them
+  // via YouTube API in the processing endpoint
+  const customMatch = url.match(/youtube\.com\/(c|user|@)\/([a-zA-Z0-9_-]+)/);
+  if (customMatch) {
+    return customMatch[2]; // Return the handle/username for API resolution
+  }
+  
+  return null;
+}

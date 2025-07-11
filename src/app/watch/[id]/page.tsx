@@ -319,7 +319,7 @@ export default function WatchPage() {
             {/* Mobile: Take remaining height, Desktop: Full height */}
             <div className="flex-1 min-h-0 lg:h-full">
               <ChatInterface
-                videoId={videoData.id}
+                videoId={videoData.youtube_id}
                 onCitationClick={handleCitationClick}
                 className="h-full"
                 initialQuestion={initialQuestion || undefined}

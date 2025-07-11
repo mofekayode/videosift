@@ -1,5 +1,5 @@
 import { supabase, supabaseAdmin } from './supabase';
-import { User, Video, Channel, VideoChunk, ChannelQueue } from '@/types';
+import { User, Video, Channel, VideoChunk, ChannelQueue, ChatSession, ChatMessage } from '@/types';
 
 // User operations
 export async function createUser(clerkId: string, email: string): Promise<User | null> {
@@ -156,17 +156,25 @@ export async function updateVideoChunkEmbedding(chunkId: string, embedding: numb
 }
 
 // Simple function to get all transcript chunks for a video (no embeddings)
-export async function getVideoTranscript(videoId: string): Promise<Array<{
+export async function getVideoTranscript(youtubeId: string): Promise<Array<{
   id: string;
   text: string;
   start_sec: number;
   end_sec: number;
 }>> {
   try {
+    // First, get the video record by YouTube ID
+    const video = await getVideoByYouTubeId(youtubeId);
+    if (!video) {
+      console.log(`Video not found for YouTube ID: ${youtubeId}`);
+      return [];
+    }
+
+    // Then get the transcript chunks using the internal video ID
     const { data, error } = await supabase
       .from('video_chunks')
       .select('id, text, start_sec, end_sec')
-      .eq('video_id', videoId)
+      .eq('video_id', video.id)
       .order('start_sec', { ascending: true });
     
     if (error) throw error;
@@ -314,5 +322,289 @@ export async function getQueueStatus(channelId: string): Promise<ChannelQueue | 
   } catch (error) {
     console.error('Error fetching queue status:', error);
     return null;
+  }
+}
+
+export async function getPendingChannels(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('channel_queue')
+      .select(`
+        *,
+        channels (
+          id,
+          youtube_channel_id,
+          title,
+          status
+        )
+      `)
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching pending channels:', error);
+    return [];
+  }
+}
+
+export async function updateChannelStatus(channelId: string, status: string, videoCount?: number): Promise<boolean> {
+  try {
+    const updateData: any = { 
+      status,
+      last_indexed_at: new Date().toISOString()
+    };
+    
+    if (videoCount !== undefined) {
+      updateData.video_count = videoCount;
+    }
+    
+    const { error } = await supabaseAdmin
+      .from('channels')
+      .update(updateData)
+      .eq('id', channelId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating channel status:', error);
+    return false;
+  }
+}
+
+export async function updateQueueItemStatus(
+  queueId: string, 
+  status: string, 
+  videosProcessed?: number, 
+  errorMessage?: string
+): Promise<boolean> {
+  try {
+    const updateData: any = { 
+      status,
+      [status === 'processing' ? 'started_at' : 'completed_at']: new Date().toISOString()
+    };
+    
+    if (videosProcessed !== undefined) {
+      updateData.videos_processed = videosProcessed;
+    }
+    
+    if (errorMessage) {
+      updateData.error_message = errorMessage;
+    }
+    
+    const { error } = await supabaseAdmin
+      .from('channel_queue')
+      .update(updateData)
+      .eq('id', queueId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating queue item status:', error);
+    return false;
+  }
+}
+
+// Chat session operations
+export async function createChatSession(videoId: string, userId?: string, anonId?: string): Promise<ChatSession | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('chat_sessions')
+      .insert([{
+        video_id: videoId,
+        user_id: userId || null,
+        anon_id: anonId || null
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating chat session:', error);
+    return null;
+  }
+}
+
+export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching chat session:', error);
+    return null;
+  }
+}
+
+export async function getChatSessionByAnonId(videoId: string, anonId: string): Promise<ChatSession | null> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('video_id', videoId)
+      .eq('anon_id', anonId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching chat session by anon_id:', error);
+    return null;
+  }
+}
+
+export async function getChatMessagesBySession(sessionId: string): Promise<ChatMessage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching chat messages:', error);
+    return [];
+  }
+}
+
+export async function saveChatMessage(sessionId: string, role: 'user' | 'assistant', content: string, citations?: any[]): Promise<ChatMessage | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('chat_messages')
+      .insert([{
+        session_id: sessionId,
+        role,
+        content,
+        citations: citations || null
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error saving chat message:', error);
+    return null;
+  }
+}
+
+export async function getChatMessageCount(sessionId: string): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('chat_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+    
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error getting chat message count:', error);
+    return 0;
+  }
+}
+
+export async function updateChatSessionTimestamp(sessionId: string): Promise<void> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('chat_sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating chat session timestamp:', error);
+  }
+}
+
+export async function migrateAnonSessionToUser(anonId: string, userId: string): Promise<number> {
+  try {
+    // First get the count of sessions that will be migrated
+    const { count: sessionsToMigrate } = await supabase
+      .from('chat_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('anon_id', anonId)
+      .is('user_id', null);
+
+    if (sessionsToMigrate === 0) {
+      return 0;
+    }
+
+    // Then perform the migration
+    const { error } = await supabaseAdmin
+      .from('chat_sessions')
+      .update({ 
+        user_id: userId,
+        anon_id: null // Clear the anon_id since it's now linked to a user
+      })
+      .eq('anon_id', anonId)
+      .is('user_id', null); // Only migrate sessions that aren't already linked to a user
+    
+    if (error) throw error;
+    
+    console.log(`✅ Migrated ${sessionsToMigrate || 0} anonymous sessions to user ${userId}`);
+    return sessionsToMigrate || 0;
+  } catch (error) {
+    console.error('Error migrating anon session to user:', error);
+    return 0;
+  }
+}
+
+export async function getUserChatSessions(userId: string): Promise<Array<{
+  id: string;
+  video_id: string;
+  created_at: string;
+  updated_at: string;
+  video?: {
+    youtube_id: string;
+    title: string;
+    thumbnail_url: string;
+  };
+  messageCount: number;
+}>> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select(`
+        id,
+        video_id,
+        created_at,
+        updated_at,
+        videos (
+          youtube_id,
+          title,
+          thumbnail_url
+        )
+      `)
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
+    
+    // Get message counts for each session
+    const sessionsWithCounts = await Promise.all(
+      (data || []).map(async (session) => {
+        const messageCount = await getChatMessageCount(session.id);
+        return {
+          ...session,
+          video: session.videos,
+          messageCount
+        };
+      })
+    );
+    
+    return sessionsWithCounts;
+  } catch (error) {
+    console.error('Error fetching user chat sessions:', error);
+    return [];
   }
 }

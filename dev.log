@@ -1,0 +1,835 @@
+
+> mindsift-frontend@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.3.5
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.15:3000
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1805ms
+ ✓ Compiled /middleware in 237ms (224 modules)
+ ○ Compiling /api/debug/db ...
+ ✓ Compiled /api/debug/db in 794ms (459 modules)
+ POST /api/debug/db 405 in 948ms
+ POST /api/debug/db 405 in 10ms
+🔍 Testing database connection...
+✅ Database connection successful
+ GET /api/debug/db 200 in 652ms
+ ✓ Compiled in 248ms (683 modules)
+ ○ Compiling /api/chat-simple ...
+ ✓ Compiled /api/chat-simple in 622ms (685 modules)
+Error creating chat session: {}
+⚠️ Using temporary session ID due to database setup issues: temp_1752223698178_6rxz3qt75
+🔍 Getting transcript for videoId: BaWUPamqWlA
+💬 Using session: temp_1752223698178_6rxz3qt75 (user: anonymous)
+Error fetching video transcript: {
+  code: '22P02',
+  details: null,
+  hint: null,
+  message: 'invalid input syntax for type uuid: "BaWUPamqWlA"'
+}
+📊 Found 0 transcript chunks for query: "Give me the key takeaways"
+ POST /api/chat-simple 200 in 1533ms
+ ✓ Compiled in 119ms (406 modules)
+Error creating chat session: {}
+⚠️ Using temporary session ID due to database setup issues: temp_1752223732556_lh4afznqk
+🔍 Getting transcript for videoId: BaWUPamqWlA
+💬 Using session: temp_1752223732556_lh4afznqk (user: anonymous)
+📊 Found 144 transcript chunks for query: "Give me the key takeaways"
+⚠️ Skipping message save for temporary session
+ POST /api/chat-simple 200 in 9666ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1669ms (1353 modules)
+ GET / 200 in 1838ms
+ ✓ Compiled in 154ms (533 modules)
+ ✓ Compiled /api/user/sync in 400ms (1455 modules)
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1554ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1742ms
+ GET / 200 in 160ms
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 480ms
+ ✓ Compiled /api/video/metadata in 403ms (1459 modules)
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 637ms
+ ✓ Compiled /api/video/transcript in 204ms (1685 modules)
+📝 Processing transcript request for video: BaWUPamqWlA
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 484ms
+ ○ Compiling /watch/[id] ...
+ ✓ Compiled /watch/[id] in 502ms (2275 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 1026ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 321ms
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 835ms
+ ○ Compiling /api/chat-simple ...
+ ✓ Compiled /api/chat-simple in 748ms (1468 modules)
+🔍 Getting transcript for videoId: cb77d805-ab84-402e-82d0-0e114f8304c0
+💬 Using session: 80635259-8f94-4ff6-a03d-2c855c012ba0 (user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7)
+Error fetching video: {
+  code: 'PGRST116',
+  details: 'The result contains 0 rows',
+  hint: null,
+  message: 'JSON object requested, multiple (or no) rows returned'
+}
+Video not found for YouTube ID: cb77d805-ab84-402e-82d0-0e114f8304c0
+📊 Found 0 transcript chunks for query: "Give me the key takeaways"
+ POST /api/chat-simple 200 in 1199ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 549ms
+📝 Processing transcript request for video: BHO_glbVcIg
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 213ms
+ GET /watch/BHO_glbVcIg?q=Give+me+the+key+takeaways 200 in 35ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 193ms
+🔍 Getting transcript for videoId: 8b1d0236-5985-40f8-a43c-ebbb0c4b0457
+💬 Using session: e91b5f7f-dca8-4741-9a09-a642e4ac45c9 (user: anonymous)
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 482ms
+Error fetching video: {
+  code: 'PGRST116',
+  details: 'The result contains 0 rows',
+  hint: null,
+  message: 'JSON object requested, multiple (or no) rows returned'
+}
+Video not found for YouTube ID: 8b1d0236-5985-40f8-a43c-ebbb0c4b0457
+📊 Found 0 transcript chunks for query: "Give me the key takeaways"
+ POST /api/chat-simple 200 in 375ms
+ GET / 200 in 15ms
+ GET / 200 in 14ms
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1119ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1204ms
+ ✓ Compiled in 768ms (2062 modules)
+ GET / 200 in 76ms
+ ✓ Compiled /api/video/metadata in 172ms (1224 modules)
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 846ms
+ ✓ Compiled /api/video/transcript in 144ms (1447 modules)
+📝 Processing transcript request for video: BaWUPamqWlA
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 454ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 90ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 204ms
+ ✓ Compiled /api/chat-simple in 188ms (1465 modules)
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 526ms
+🔍 Getting transcript for videoId: BaWUPamqWlA
+💬 Using session: 7190605f-7397-46b9-a57e-c38e8cbecddd (user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7)
+📊 Found 144 transcript chunks for query: "Give me the key takeaways"
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 515ms
+📝 Processing transcript request for video: BHO_glbVcIg
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 227ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 40ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 232ms
+🔍 Getting transcript for videoId: 8b1d0236-5985-40f8-a43c-ebbb0c4b0457
+💬 Using session: 4c3d3a37-a669-4ceb-8188-433759c1ba38 (user: anonymous)
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 507ms
+Error fetching video: {
+  code: 'PGRST116',
+  details: 'The result contains 0 rows',
+  hint: null,
+  message: 'JSON object requested, multiple (or no) rows returned'
+}
+Video not found for YouTube ID: 8b1d0236-5985-40f8-a43c-ebbb0c4b0457
+📊 Found 0 transcript chunks for query: "Summarize this video"
+ POST /api/chat-simple 200 in 391ms
+ POST /api/chat-simple 200 in 10392ms
+ GET / 200 in 25ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 530ms
+📝 Processing transcript request for video: BHO_glbVcIg
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 206ms
+ GET / 200 in 134ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 518ms
+📝 Processing transcript request for video: BHO_glbVcIg
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 197ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 13ms
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 208ms
+🔍 Getting transcript for videoId: BHO_glbVcIg
+💬 Using session: 8af54eaf-58ef-4515-9d51-399b3924e034 (user: anonymous)
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 511ms
+📊 Found 670 transcript chunks for query: "Summarize this video"
+ POST /api/chat-simple 200 in 7603ms
+ ✓ Compiled in 601ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 125ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 126ms
+ ✓ Compiled in 202ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 18ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 12ms
+ ✓ Compiled in 141ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 27ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 28ms
+ ✓ Compiled in 137ms (823 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 23ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 25ms
+ ✓ Compiled /api/chat-simple in 829ms (1947 modules)
+ ✓ Compiled in 0ms (1338 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 523ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 524ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 13ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 15ms
+🔍 Getting transcript for videoId: BHO_glbVcIg
+💬 Using session: c78b3771-5ac3-40f7-874c-b656717ac82f (user: anonymous)
+🔍 Getting transcript for videoId: BaWUPamqWlA
+💬 Using session: 2f0d19c1-2c15-44f7-98df-32f4f4e05332 (user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7)
+📊 Session message count: 0/10
+📊 Session message count: 0/50
+📊 Found 144 transcript chunks for query: "Give me the key takeaways"
+📊 Found 670 transcript chunks for query: "Summarize this video"
+ ✓ Compiled in 337ms (2161 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 187ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 190ms
+ POST /api/chat-simple 200 in 11154ms
+ POST /api/chat-simple 200 in 12929ms
+ ✓ Compiled in 598ms (2161 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 47ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 47ms
+ ✓ Compiled in 442ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 133ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 134ms
+ ✓ Compiled in 639ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 86ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 88ms
+ ✓ Compiled in 251ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 21ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 21ms
+ ✓ Compiled in 112ms (823 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 18ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 19ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 53ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 55ms
+ ✓ Compiled in 726ms (2157 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 104ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 104ms
+ ✓ Compiled in 225ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 24ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 26ms
+ ✓ Compiled in 344ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 29ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 30ms
+ ✓ Compiled in 658ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 83ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 16ms
+ ✓ Compiled in 369ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 84ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 83ms
+ ✓ Compiled in 215ms (823 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 33ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 34ms
+ ✓ Compiled in 210ms (823 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 28ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 29ms
+ ✓ Compiled in 390ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 81ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 81ms
+ ✓ Compiled in 236ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 46ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 47ms
+ ✓ Compiled in 282ms (823 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 27ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 27ms
+ ✓ Compiled in 855ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 78ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 18ms
+ ✓ Compiled in 475ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 101ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 102ms
+ ✓ Compiled in 1009ms (2171 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 771ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 770ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 14ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 15ms
+ ✓ Compiled in 270ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 82ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 84ms
+ ✓ Compiled in 683ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 65ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 17ms
+ ✓ Compiled in 248ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 39ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 39ms
+ ✓ Compiled in 251ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 38ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 39ms
+ ✓ Compiled in 501ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 58ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 58ms
+ ✓ Compiled in 251ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 38ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 38ms
+ ✓ Compiled in 305ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 56ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 55ms
+ ✓ Compiled in 264ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 49ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 49ms
+ ✓ Compiled in 386ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 57ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 56ms
+ ✓ Compiled in 251ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 41ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 44ms
+ ✓ Compiled in 324ms (1947 modules)
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 53ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 54ms
+ ✓ Compiled in 435ms (1947 modules)
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 63ms
+ GET /watch/BaWUPamqWlA?q=Give+me+the+key+takeaways 200 in 64ms
+ GET / 200 in 60ms
+ ○ Compiling /api/user/sync ...
+ ✓ Compiled /api/user/sync in 738ms (1239 modules)
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+ GET / 200 in 52ms
+ GET /watch/BHO_glbVcIg?q=Summarize+this+video 200 in 53ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1947ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1997ms
+ GET / 200 in 26ms
+ GET / 200 in 166ms
+ ✓ Compiled /api/video/metadata in 172ms (1243 modules)
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BaWUPamqWlA
+📺 Extracted video ID: BaWUPamqWlA
+ GET / 200 in 67ms
+ GET / 200 in 67ms
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 721ms
+ ✓ Compiled /api/video/transcript in 265ms (1466 modules)
+📝 Processing transcript request for video: BaWUPamqWlA
+ GET / 200 in 53ms
+ GET / 200 in 53ms
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 581ms
+ ✓ Compiled in 906ms (1947 modules)
+ GET / 200 in 153ms
+ GET / 200 in 153ms
+ ✓ Compiled in 361ms (1947 modules)
+ GET / 200 in 67ms
+ GET / 200 in 68ms
+ ✓ Compiled in 448ms (1947 modules)
+ GET / 200 in 81ms
+ GET / 200 in 80ms
+ ✓ Compiled in 239ms (1947 modules)
+ GET / 200 in 42ms
+ GET / 200 in 43ms
+ ✓ Compiled in 371ms (1947 modules)
+ GET / 200 in 56ms
+ GET / 200 in 58ms
+ ✓ Compiled in 331ms (1947 modules)
+ GET / 200 in 59ms
+ GET / 200 in 62ms
+ ✓ Compiled in 454ms (1947 modules)
+ GET / 200 in 50ms
+ GET / 200 in 50ms
+ GET / 200 in 187ms
+ ○ Compiling /api/user/sync ...
+ ✓ Compiled /api/user/sync in 605ms (1239 modules)
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1623ms
+ ✓ Compiled /api/video/metadata in 128ms (1243 modules)
+🔍 Processing video metadata request for URL: https://www.youtube.com/watch?v=BHO_glbVcIg
+📺 Extracted video ID: BHO_glbVcIg
+🗃️ Video in database: Found
+ POST /api/video/metadata 200 in 671ms
+ ✓ Compiled /api/video/transcript in 234ms (1466 modules)
+📝 Processing transcript request for video: BHO_glbVcIg
+🗃️ Video found in database: Yes
+✅ Transcript already cached
+ POST /api/video/transcript 200 in 499ms
+ GET / 200 in 212ms
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1071ms
+ ✓ Compiled in 181ms (823 modules)
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1089ms (2276 modules)
+ GET / 404 in 1209ms
+ GET / 404 in 1207ms
+ GET / 200 in 20ms
+ GET / 200 in 20ms
+ GET / 200 in 12ms
+ GET / 200 in 11ms
+ GET / 200 in 141ms
+ GET / 200 in 34ms
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 1288ms
+ ✓ Compiled in 499ms (2066 modules)
+ GET / 200 in 61ms
+ GET / 200 in 62ms
+ ✓ Compiled in 771ms (2276 modules)
+ GET / 200 in 652ms
+ GET / 200 in 654ms
+ GET / 200 in 17ms
+ GET / 200 in 17ms
+ ✓ Compiled in 108ms (826 modules)
+ GET / 200 in 17ms
+ GET / 200 in 17ms
+ ✓ Compiled in 144ms (826 modules)
+ GET / 200 in 33ms
+ GET / 200 in 33ms
+ ✓ Compiled in 104ms (823 modules)
+ GET / 200 in 15ms
+ GET / 200 in 15ms
+ ✓ Compiled in 699ms (2157 modules)
+ GET / 200 in 547ms
+ GET / 200 in 548ms
+ GET / 200 in 12ms
+ GET / 200 in 12ms
+ ✓ Compiled in 538ms (1933 modules)
+ ✓ Compiled in 339ms (823 modules)
+ GET / 200 in 96ms
+ GET / 200 in 12ms
+ ✓ Compiled in 133ms (823 modules)
+ GET / 200 in 18ms
+ GET / 200 in 17ms
+ ✓ Compiled in 231ms (823 modules)
+ GET / 200 in 24ms
+ GET / 200 in 24ms
+ ✓ Compiled in 254ms (823 modules)
+ GET / 200 in 22ms
+ GET / 200 in 22ms
+ ✓ Compiled in 155ms (823 modules)
+ GET / 200 in 18ms
+ GET / 200 in 20ms
+ ✓ Compiled in 129ms (823 modules)
+ GET / 200 in 17ms
+ GET / 200 in 19ms
+ ✓ Compiled in 296ms (823 modules)
+ GET / 200 in 36ms
+ GET / 200 in 36ms
+ ✓ Compiled in 116ms (823 modules)
+ GET / 200 in 12ms
+ GET / 200 in 12ms
+ ✓ Compiled in 1271ms (2157 modules)
+ GET / 200 in 1130ms
+ GET / 200 in 545ms
+ GET / 200 in 13ms
+ GET / 200 in 8ms
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (150kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ○ Compiling /api/debug/send-test-emails ...
+ ✓ Compiled /api/debug/send-test-emails in 714ms (1987 modules)
+📧 Sending test emails to: mofekayode@gmail.com
+1. Sending welcome email...
+📧 Sending welcome email to mofekayode@gmail.com
+✅ Welcome email sent successfully: undefined
+2. Sending channel success email...
+📧 Sending email notification to mofekayode@gmail.com for channel: AI Explained
+✅ Email sent successfully: undefined
+3. Sending channel failure email...
+📧 Sending email notification to mofekayode@gmail.com for channel: Tech Tutorials Channel
+✅ Email sent successfully: undefined
+✅ All test emails sent successfully
+ GET /api/debug/send-test-emails 200 in 2569ms
+ ✓ Compiled in 369ms (823 modules)
+ GET / 200 in 139ms
+ GET / 200 in 139ms
+ ✓ Compiled in 868ms (2157 modules)
+ GET / 200 in 668ms
+ GET / 200 in 669ms
+ GET / 200 in 11ms
+ GET / 200 in 11ms
+ ✓ Compiled in 270ms (823 modules)
+ GET / 200 in 26ms
+ GET / 200 in 31ms
+ ✓ Compiled in 592ms (1947 modules)
+ GET / 200 in 65ms
+ GET / 200 in 66ms
+ ✓ Compiled in 650ms (2157 modules)
+ GET / 200 in 543ms
+ GET / 200 in 545ms
+ GET / 200 in 13ms
+ GET / 200 in 14ms
+ ✓ Compiled /api/debug/test-resend in 469ms (1986 modules)
+⚠️ Resend API key format looks incorrect
+🧪 Testing Resend configuration...
+📧 Resend API Response: {
+  data: null,
+  error: {
+    statusCode: 400,
+    message: 'API key is invalid',
+    name: 'validation_error'
+  }
+}
+ GET /api/debug/test-resend 200 in 1370ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `React`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <React.Fragment>
+     : [35;1m     ^^^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ ○ Compiling /_error ...
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `React`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <React.Fragment>
+     : [35;1m     ^^^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET / 500 in 3396ms
+ GET / 500 in 3396ms
+ GET / 500 in 7ms
+ GET / 500 in 6ms
+ GET / 500 in 6ms
+ GET / 500 in 6ms
+ GET / 500 in 8ms
+ GET / 500 in 177ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `React`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <React.Fragment>
+     : [35;1m     ^^^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 965ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 958ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 13ms
+ GET / 500 in 5ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <>
+     : [35;1m     ^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+  [31mx[0m Expected ',', got '{'
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:236:1]
+ [2m233[0m |   return (
+ [2m234[0m |     <>
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+     : [35;1m      ^[0m
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+ [2m238[0m |           showBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
+ [2m239[0m |         }`}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 421ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 415ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 12ms
+ GET / 500 in 7ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Expression expected
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <>
+     : [35;1m     ^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+  [31mx[0m Expected ',', got '{'
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:236:1]
+ [2m233[0m |   return (
+ [2m234[0m |     <>
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+     : [35;1m      ^[0m
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+ [2m238[0m |           showBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
+ [2m239[0m |         }`}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 382ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 383ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 16ms
+ GET / 500 in 10ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <div>
+     : [35;1m     ^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 410ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 409ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 200 in 5ms
+ GET / 500 in 18ms
+ GET / 500 in 14ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <div>
+     : [35;1m     ^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 810ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 799ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 21ms
+ GET / 500 in 18ms
+   Reload env: .env
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <div>
+     : [35;1m     ^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 1207ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 1204ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 500 in 10ms
+ GET / 500 in 8ms
+   Reload env: .env.local
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <div>
+     : [35;1m     ^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 463ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 462ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 12ms
+ GET / 500 in 8ms
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4m/Users/eyimofeblessing-kayode/Desktop/mindsift/frontend-v0/src/app/page.tsx[0m:234:1]
+ [2m231[0m |   };
+ [2m232[0m | 
+ [2m233[0m |   return (
+ [2m234[0m |     <div>
+     : [35;1m     ^^^[0m
+ [2m235[0m |       {/* Top Banner - Fade in after 2 seconds */}
+ [2m236[0m |       {bannerVisible && (
+ [2m237[0m |         <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 547ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 500 in 546ms
+ GET /api/debug/test-resend 500 in 657ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 500 in 8ms
+ GET / 500 in 11ms
+ ✓ Compiled /_not-found in 1531ms (2267 modules)
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 404 in 1770ms
+ GET /_next/static/webpack/109e2f31ed38346f.webpack.hot-update.json 404 in 1769ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET / 200 in 95ms
+ GET / 200 in 60ms
+ ○ Compiling /api/user/sync ...
+ ✓ Compiled /api/user/sync in 1305ms (1375 modules)
+🔄 Syncing user: user_2zi7FAeNZwDAEgUjqgLRxz1fnK7
+ GET / 200 in 50ms
+ GET / 200 in 51ms
+✅ User already exists in Supabase: 2c7419d7-c384-4cf3-8fe4-f9ed93876b53
+ POST /api/user/sync 200 in 2860ms
+ ✓ Compiled /api/debug/test-resend in 290ms (1377 modules)
+✅ Resend API key is properly formatted
+🧪 Testing Resend configuration...
+📧 Resend API Response: {
+  data: null,
+  error: {
+    statusCode: 403,
+    message: 'The mindsift.ai domain is not verified. Please, add and verify your domain on https://resend.com/domains',
+    name: 'validation_error'
+  }
+}
+ GET /api/debug/test-resend 200 in 1217ms
+ ✓ Compiled in 553ms (2446 modules)
+ GET / 200 in 94ms
+ GET / 200 in 96ms
+ ✓ Compiled in 581ms (2446 modules)
+ GET / 200 in 44ms
+ GET / 200 in 44ms
+ ✓ Compiled in 753ms (2446 modules)
+ GET / 200 in 53ms
+ GET / 200 in 55ms
+✅ Resend API key is properly formatted
+🧪 Testing Resend configuration...
+📧 Resend API Response: { data: { id: 'e1de0aef-256a-48c5-b0a3-fcfbf4d37648' }, error: null }
+ GET /api/debug/test-resend 200 in 969ms
+ ✓ Compiled /api/debug/send-test-emails in 501ms (1379 modules)
+📧 Sending test emails to: mofekayode@gmail.com
+1. Sending welcome email...
+📧 Sending welcome email to mofekayode@gmail.com
+ GET / 200 in 30ms
+ GET / 200 in 39ms
+✅ Welcome email sent successfully: 3cd4d805-b8e7-43e0-a7c9-7a3de512a192
+2. Sending channel success email...
+📧 Sending email notification to mofekayode@gmail.com for channel: AI Explained
+✅ Email sent successfully: 5ef9606b-01d4-4eb2-872c-0fcf325229fd
+3. Sending channel failure email...
+📧 Sending email notification to mofekayode@gmail.com for channel: Tech Tutorials Channel
+✅ Email sent successfully: ea272cdb-f6da-4e97-a80b-5acccf67ab96
+✅ All test emails sent successfully
+ GET /api/debug/send-test-emails 200 in 3024ms

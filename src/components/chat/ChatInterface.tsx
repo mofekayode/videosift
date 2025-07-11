@@ -10,6 +10,7 @@ import { handleApiError, getOpenAIErrorMessage } from '@/components/ui/error';
 import { useUser, SignUpButton } from '@clerk/nextjs';
 import { Send, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { ChatMessage } from '@/types';
+import { generateAnonId, getStoredAnonId, setStoredAnonId } from '@/lib/session';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -42,6 +43,13 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [autoSearchExecuted, setAutoSearchExecuted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [anonId, setAnonId] = useState<string | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<{
+    messageCount: number;
+    limit: number;
+    remaining: number;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -52,6 +60,19 @@ export function ChatInterface({
     scrollToBottom();
   }, [messages]);
 
+  // Initialize session on component mount
+  useEffect(() => {
+    if (!isSignedIn) {
+      // For anonymous users, get or create anon ID
+      let storedAnonId = getStoredAnonId();
+      if (!storedAnonId) {
+        storedAnonId = generateAnonId();
+        setStoredAnonId(storedAnonId);
+      }
+      setAnonId(storedAnonId);
+    }
+  }, [isSignedIn]);
+
   // Auto-search with initial question from URL parameter
   useEffect(() => {
     if (initialQuestion && initialQuestion.trim() && !autoSearchExecuted && videoId) {
@@ -61,9 +82,10 @@ export function ChatInterface({
       // Set up the initial message first
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
+        session_id: '',
         role: 'user',
         content: initialQuestion.trim(),
-        timestamp: new Date(),
+        created_at: new Date().toISOString(),
       };
       
       setMessages([userMessage]);
@@ -117,24 +139,52 @@ export function ChatInterface({
         body: JSON.stringify({
           query,
           videoId,
-          messages: messages.slice(-5) // Keep last 5 messages for context
+          messages: messages.slice(-5), // Keep last 5 messages for context
+          sessionId,
+          anonId
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle rate limit (session limit reached)
+        if (response.status === 429 && errorData.limitReached) {
+          const limitMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            session_id: sessionId || '',
+            role: 'assistant',
+            content: errorData.error,
+            created_at: new Date().toISOString(),
+          };
+          setMessages(prev => [...prev, limitMessage]);
+          setIsLoading(false);
+          return;
+        }
+        
         const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
 
+      // Update session ID if returned from server
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId);
+      }
+
+      // Update session info if provided
+      if (data.sessionInfo) {
+        setSessionInfo(data.sessionInfo);
+      }
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
+        session_id: data.sessionId || '',
         role: 'assistant',
         content: data.response,
         citations: data.citations,
-        timestamp: new Date(),
+        created_at: new Date().toISOString(),
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -147,9 +197,10 @@ export function ChatInterface({
       
       const assistantErrorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
+        session_id: sessionId || '',
         role: 'assistant',
         content: `I encountered an error: ${errorMessage}`,
-        timestamp: new Date(),
+        created_at: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantErrorMessage]);
     } finally {
@@ -163,9 +214,10 @@ export function ChatInterface({
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
+      session_id: sessionId || '',
       role: 'user',
       content: input.trim(),
-      timestamp: new Date(),
+      created_at: new Date().toISOString(),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -212,6 +264,25 @@ export function ChatInterface({
           </Button>
         </div>
       )}
+
+      {/* Session Usage Indicator */}
+      {sessionInfo && sessionInfo.remaining < 5 && (
+        <div className="bg-orange-500/10 border-l-4 border-orange-500 p-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-orange-600 dark:text-orange-400">
+              {sessionInfo.remaining > 0 
+                ? `${sessionInfo.remaining} messages remaining in this session`
+                : 'Session limit reached'
+              }
+            </span>
+            {!isSignedIn && sessionInfo.remaining > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Sign in for higher limits
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto bg-background">
@@ -229,9 +300,10 @@ export function ChatInterface({
                   const question = "What is this video about?";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
+                    session_id: sessionId || '',
                     role: 'user',
                     content: question,
-                    timestamp: new Date(),
+                    created_at: new Date().toISOString(),
                   };
                   setMessages([userMessage]);
                   setIsLoading(true);
@@ -249,9 +321,10 @@ export function ChatInterface({
                   const question = "Give me the key takeaways";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
+                    session_id: sessionId || '',
                     role: 'user',
                     content: question,
-                    timestamp: new Date(),
+                    created_at: new Date().toISOString(),
                   };
                   setMessages([userMessage]);
                   setIsLoading(true);
@@ -269,9 +342,10 @@ export function ChatInterface({
                   const question = "Summarize the main points";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
+                    session_id: sessionId || '',
                     role: 'user',
                     content: question,
-                    timestamp: new Date(),
+                    created_at: new Date().toISOString(),
                   };
                   setMessages([userMessage]);
                   setIsLoading(true);
@@ -342,14 +416,18 @@ export function ChatInterface({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="What do you want to know next?"
-              disabled={isLoading}
+              placeholder={
+                sessionInfo?.remaining === 0 
+                  ? "Session limit reached - start a new chat" 
+                  : "What do you want to know next?"
+              }
+              disabled={isLoading || (sessionInfo?.remaining === 0)}
               className="w-full resize-none border-0 bg-muted/50 rounded-xl p-4 pr-12 text-sm focus:ring-0 focus:outline-none focus:border-transparent focus:ring-transparent focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/60 min-h-[60px] max-h-40"
               rows={2}
             />
             <Button 
               onClick={sendMessage} 
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || !input.trim() || (sessionInfo?.remaining === 0)}
               size="icon"
               className="absolute right-2 bottom-2 h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted"
             >
@@ -465,7 +543,7 @@ function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
             </div>
           </div>
           <div className={`text-[11px] mt-2 text-[#7A7A8C] ${isUser ? 'text-right' : ''}`}>
-            {message.timestamp.toLocaleTimeString()}
+            {new Date(message.created_at).toLocaleTimeString()}
           </div>
         </div>
         {isUser && (
