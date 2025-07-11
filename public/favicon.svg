@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="150" fill="#7B68EE"/>
+  
+  <!-- M letter using path for better control -->
+  <path d="M160 140v232h48V208l48 96 48-96v164h48V140h-64l-32 64-32-64h-64z" fill="white"/>
+</svg>

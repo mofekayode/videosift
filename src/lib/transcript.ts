@@ -3,18 +3,12 @@ import { generateEmbedding } from './openai';
 import { createVideoChunks, updateVideoTranscriptStatus } from './database';
 import { TranscriptSegment } from '@/types';
 
-interface TranscriptItem {
-  start: string;
-  duration: string;
-  text: string;
-}
-
 export async function downloadTranscript(videoId: string): Promise<TranscriptSegment[]> {
   try {
     console.log(`📥 Downloading transcript for video: ${videoId}`);
     
     // Get the transcript using the static method (v2.0.4 API)
-    const transcript: TranscriptItem[] = await YoutubeTranscriptApi.getTranscript(videoId);
+    const transcript = await YoutubeTranscriptApi.getTranscript(videoId);
     console.log('✅ Raw transcript received:', transcript ? `${transcript.length} segments` : 'null/undefined');
     
     if (!transcript || transcript.length === 0) {
@@ -24,9 +18,9 @@ export async function downloadTranscript(videoId: string): Promise<TranscriptSeg
     console.log(`✅ Downloaded ${transcript.length} transcript segments`);
     
     // Convert to our format (matching your working code structure)
-    const segments: TranscriptSegment[] = transcript.map((segment: TranscriptItem) => {
-      const startTime = parseFloat(segment.start); // Convert string to number
-      const duration = parseFloat(segment.duration); // Convert string to number
+    const segments: TranscriptSegment[] = transcript.map((segment) => {
+      const startTime = typeof segment.start === 'string' ? parseFloat(segment.start) : segment.start;
+      const duration = typeof segment.duration === 'string' ? parseFloat(segment.duration) : segment.duration;
       
       return {
         start: Math.floor(startTime),

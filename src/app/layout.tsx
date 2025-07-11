@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MindSift - Chat with YouTube Videos",
   description: "Chat with any YouTube video using AI. Paste a link and start asking questions.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -239,7 +239,7 @@ export default function WatchPage() {
       }`}>{/* Dynamic padding based on banner visibility */}
       
       {/* Header */}
-      <header className="border-b p-2 sm:p-4 flex items-center">
+      <header className="border-b p-2 sm:p-4 flex items-center ml-8 sm:ml-12">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/">
             <ArrowLeft className="w-4 h-4 sm:mr-2" />
@@ -322,7 +322,7 @@ export default function WatchPage() {
                 videoId={videoData.id}
                 onCitationClick={handleCitationClick}
                 className="h-full"
-                initialQuestion={initialQuestion}
+                initialQuestion={initialQuestion || undefined}
                 onCitationsUpdate={setCitationTimestamps}
               />
             </div>
