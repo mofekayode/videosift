@@ -24,8 +24,14 @@ export default function Home() {
   const [isValidUrl, setIsValidUrl] = useState(false);
   const [videoPreview, setVideoPreview] = useState<{ title: string; thumbnail: string } | null>(null);
   const [isPreprocessing, setIsPreprocessing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const { bannerVisible, setBannerVisible, showBanner } = useBanner();
   const questionRef = useRef<HTMLTextAreaElement>(null);
+
+  // Prevent hydration issues by only rendering animations on client
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleUrlChange = async (newUrl: string) => {
     setUrl(newUrl);
@@ -199,79 +205,81 @@ export default function Home() {
       )}
       
       {/* Subtle Background Animation */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <style jsx>{`
-          @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            33% { transform: translateY(-20px) rotate(1deg); }
-            66% { transform: translateY(-10px) rotate(-1deg); }
-          }
-          @keyframes float-slow {
-            0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
-            25% { transform: translateY(-30px) translateX(10px) rotate(0.5deg); }
-            50% { transform: translateY(-15px) translateX(-5px) rotate(-0.5deg); }
-            75% { transform: translateY(-25px) translateX(5px) rotate(0.3deg); }
-          }
-          .animate-float {
-            animation: float 12s ease-in-out infinite;
-          }
-          .animate-float-slow {
-            animation: float-slow 20s ease-in-out infinite;
-          }
-        `}</style>
-        
-        {/* Large floating orbs */}
-        <div className="absolute inset-0">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className={`absolute rounded-full bg-gradient-to-r from-purple-500/4 to-blue-500/4 animate-float-slow blur-xl`}
-              style={{
-                width: `${Math.random() * 400 + 200}px`,
-                height: `${Math.random() * 400 + 200}px`,
-                left: `${Math.random() * 80 + 10}%`,
-                top: `${Math.random() * 80 + 10}%`,
-                animationDelay: `${Math.random() * 10}s`,
-              }}
-            />
-          ))}
+      {isMounted && (
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+          <style jsx>{`
+            @keyframes float {
+              0%, 100% { transform: translateY(0px) rotate(0deg); }
+              33% { transform: translateY(-20px) rotate(1deg); }
+              66% { transform: translateY(-10px) rotate(-1deg); }
+            }
+            @keyframes float-slow {
+              0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+              25% { transform: translateY(-30px) translateX(10px) rotate(0.5deg); }
+              50% { transform: translateY(-15px) translateX(-5px) rotate(-0.5deg); }
+              75% { transform: translateY(-25px) translateX(5px) rotate(0.3deg); }
+            }
+            .animate-float {
+              animation: float 12s ease-in-out infinite;
+            }
+            .animate-float-slow {
+              animation: float-slow 20s ease-in-out infinite;
+            }
+          `}</style>
+          
+          {/* Large floating orbs */}
+          <div className="absolute inset-0">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className={`absolute rounded-full bg-gradient-to-r from-purple-500/4 to-blue-500/4 animate-float-slow blur-xl`}
+                style={{
+                  width: `${Math.random() * 400 + 200}px`,
+                  height: `${Math.random() * 400 + 200}px`,
+                  left: `${Math.random() * 80 + 10}%`,
+                  top: `${Math.random() * 80 + 10}%`,
+                  animationDelay: `${Math.random() * 10}s`,
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Medium floating particles */}
+          <div className="absolute inset-0">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className={`absolute rounded-full bg-gradient-to-r from-cyan-400/6 to-purple-400/6 animate-float blur-sm`}
+                style={{
+                  width: `${Math.random() * 150 + 80}px`,
+                  height: `${Math.random() * 150 + 80}px`,
+                  left: `${Math.random() * 90 + 5}%`,
+                  top: `${Math.random() * 90 + 5}%`,
+                  animationDelay: `${Math.random() * 15}s`,
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Small twinkling dots */}
+          <div className="absolute inset-0">
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className={`absolute rounded-full bg-gradient-to-r from-white/8 to-blue-200/8 animate-pulse`}
+                style={{
+                  width: `${Math.random() * 4 + 2}px`,
+                  height: `${Math.random() * 4 + 2}px`,
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 5}s`,
+                  animationDuration: `${Math.random() * 3 + 2}s`
+                }}
+              />
+            ))}
+          </div>
         </div>
-        
-        {/* Medium floating particles */}
-        <div className="absolute inset-0">
-          {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              className={`absolute rounded-full bg-gradient-to-r from-cyan-400/6 to-purple-400/6 animate-float blur-sm`}
-              style={{
-                width: `${Math.random() * 150 + 80}px`,
-                height: `${Math.random() * 150 + 80}px`,
-                left: `${Math.random() * 90 + 5}%`,
-                top: `${Math.random() * 90 + 5}%`,
-                animationDelay: `${Math.random() * 15}s`,
-              }}
-            />
-          ))}
-        </div>
-        
-        {/* Small twinkling dots */}
-        <div className="absolute inset-0">
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={i}
-              className={`absolute rounded-full bg-gradient-to-r from-white/8 to-blue-200/8 animate-pulse`}
-              style={{
-                width: `${Math.random() * 4 + 2}px`,
-                height: `${Math.random() * 4 + 2}px`,
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 5}s`,
-                animationDuration: `${Math.random() * 3 + 2}s`
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      )}
       
       <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 pb-20 sm:pb-4 transition-all duration-300 relative z-10 ${
         bannerVisible && showBanner ? 'pt-16' : 'pt-4'
