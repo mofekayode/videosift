@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
-import { generateChatResponse } from '@/lib/openai';
-import { extractCitations } from '@/lib/transcript';
+import { chatWithAssistant } from '@/lib/openai-assistant';
 import { 
   createChatSession, 
   saveChatMessage, 
@@ -72,41 +71,19 @@ export async function POST(request: NextRequest) {
       thumbnail_url: video.thumbnail_url
     }));
     
-    // Get transcripts for all videos
-    const transcriptPromises = videos.map(async (video) => {
-      const { data: transcript, error } = await supabase
-        .from('video_chunks')
-        .select('*')
-        .eq('video_id', video.id)
-        .order('start_sec', { ascending: true });
-      
-      if (error || !transcript) {
-        console.warn(`No transcript found for video ${video.youtube_id}`);
-        return [];
-      }
-      
-      // Add video info to each chunk
-      return transcript.map(chunk => ({
-        text: chunk.text,
-        start_sec: chunk.start_sec,
-        end_sec: chunk.end_sec,
-        video_title: video.title,
-        video_youtube_id: video.youtube_id,
-        video_thumbnail: video.thumbnail_url
-      }));
-    });
-    
-    const allTranscripts = await Promise.all(transcriptPromises);
-    const transcriptChunks = allTranscripts.flat();
-    
-    console.log('📊 Found transcript chunks:', transcriptChunks.length);
-    
-    if (transcriptChunks.length === 0) {
+    // Check if all videos have vector stores
+    const videosWithoutVectorStore = videos.filter(v => !v.vector_store_id);
+    if (videosWithoutVectorStore.length > 0) {
+      console.warn('Some videos do not have vector stores:', videosWithoutVectorStore.map(v => v.youtube_id));
       return NextResponse.json(
-        { error: 'No transcripts found for the provided videos' },
-        { status: 404 }
+        { error: 'Some videos are still being processed. Please try again later.' },
+        { status: 503 }
       );
     }
+    
+    // Get all vector store IDs
+    const vectorStoreIds = videos.map(v => v.vector_store_id).filter(Boolean);
+    console.log('📊 Using vector stores:', vectorStoreIds);
     
     // Create or get session
     let currentSessionId = sessionId;
@@ -132,22 +109,31 @@ export async function POST(request: NextRequest) {
       }, { status: 429 });
     }
     
-    // Generate AI response with multi-video context
-    const response = await generateChatResponse(
-      [{ role: 'user', content: message }],
-      transcriptChunks,
-      'gpt-4o'
-    );
+    // Generate AI response using Assistant API with multiple vector stores
+    let response;
+    let citations;
     
-    if (!response) {
+    try {
+      console.log('🤖 Using OpenAI Assistant API with multiple vector stores');
+      
+      const assistantResponse = await chatWithAssistant(
+        message,
+        vectorStoreIds, // Pass array of vector store IDs
+        currentSessionId ? `thread_${currentSessionId}` : undefined
+      );
+      
+      response = assistantResponse.response;
+      citations = assistantResponse.citations;
+      
+      console.log('✅ Multi-video response generated');
+      
+    } catch (error) {
+      console.error('❌ Assistant API error:', error);
       return NextResponse.json(
         { error: 'Failed to generate response' },
         { status: 500 }
       );
     }
-    
-    // Extract citations from response
-    const citations = extractCitations(response);
     
     // Save messages to database
     try {
@@ -158,12 +144,10 @@ export async function POST(request: NextRequest) {
     }
     
     // Analyze which videos were referenced in the response
+    // Since we don't have chunk-level attribution with vector stores,
+    // we'll do simple title matching for now
     const referencedVideos = videoSources.filter(video => 
-      response.toLowerCase().includes(video.title.toLowerCase()) ||
-      transcriptChunks.some(chunk => 
-        chunk.video_youtube_id === video.youtube_id && 
-        citations.some(citation => response.includes(citation))
-      )
+      response.toLowerCase().includes(video.title.toLowerCase())
     );
     
     return NextResponse.json({

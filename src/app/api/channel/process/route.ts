@@ -145,8 +145,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Channel processing error:', error);
+    
+    // Return more detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = error instanceof Error && 'details' in error ? (error as any).details : null;
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: errorMessage,
+        details: errorDetails
+      },
       { status: 500 }
     );
   }

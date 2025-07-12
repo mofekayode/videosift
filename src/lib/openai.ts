@@ -1,9 +1,29 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    console.log('🔑 Creating OpenAI client...');
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    console.log('🔑 API Key exists:', !!apiKey);
+    console.log('🔑 API Key length:', apiKey ? apiKey.length : 0);
+    console.log('🔑 API Key prefix:', apiKey ? apiKey.substring(0, 10) + '...' : 'Not found');
+    
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set');
+    }
+    
+    openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    console.log('✅ OpenAI client created successfully');
+  }
+  
+  return openai;
+}
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -18,7 +38,9 @@ export interface EmbeddingResponse {
 // Generate embeddings for text
 export async function generateEmbedding(text: string): Promise<EmbeddingResponse | null> {
   try {
-    const response = await openai.embeddings.create({
+    const client = getOpenAIClient();
+    
+    const response = await client.embeddings.create({
       model: 'text-embedding-3-small',
       input: text,
       encoding_format: 'float',
@@ -43,9 +65,20 @@ export async function generateChatResponse(
     end_sec: number;
     video_title?: string;
   }>,
-  model: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-3.5-turbo' = 'gpt-4o-mini'
+  model: 'gpt-4' | 'gpt-4-turbo-preview' | 'gpt-3.5-turbo' = 'gpt-3.5-turbo'
 ): Promise<string | null> {
   try {
+    console.log('🤖 Starting OpenAI chat generation...');
+    console.log('📊 Transcript chunks:', transcriptChunks.length);
+    console.log('💬 Messages:', messages.length);
+    console.log('🔧 Model:', model);
+    
+    // Check if API key exists
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ OPENAI_API_KEY is not set!');
+      throw new Error('OpenAI API key is not configured');
+    }
+    
     // Prepare the context from transcript chunks
     // Use ALL transcript chunks
     const context = transcriptChunks
@@ -56,38 +89,74 @@ export async function generateChatResponse(
       })
       .join('\n\n');
 
+    console.log('📝 Context length:', context.length, 'characters');
+
+    // Calculate max video duration from chunks
+    const maxSeconds = Math.max(...transcriptChunks.map(c => c.end_sec));
+    const maxMinutes = Math.floor(maxSeconds / 60);
+    
     const systemPrompt = `You are a helpful AI assistant that answers questions about YouTube videos based on their transcripts. 
 
-INSTRUCTIONS:
-- Base your answers ONLY on the provided transcript chunks
-- Include timestamp citations INLINE throughout your response using the format [timestamp] 
-- Place citations immediately after the specific information they support
-- Use the exact timestamps provided (e.g., [01:23], [15:42])
-- Be conversational and friendly
-- If you can't answer based on the video content, say "The video doesn't cover that topic" instead of "transcript doesn't"
-- Provide specific, detailed answers when possible
+CRITICAL TIMESTAMP RULES:
+- This video is ${maxMinutes} minutes long (${maxSeconds} seconds total)
+- ONLY use timestamps between [00:00] and [${formatTimestamp(maxSeconds)}]
+- ONLY use timestamps that are explicitly provided in the transcript chunks below
+- NEVER make up or guess timestamps
+- NEVER use timestamps beyond ${formatTimestamp(maxSeconds)}
+- Each transcript chunk is prefixed with its exact timestamp - use ONLY these timestamps
+- If you cannot find a specific timestamp for information, do not include any timestamp
 
-EXAMPLE FORMAT:
-"The video discusses quantum mechanics [02:15] and how Einstein disagreed with certain interpretations [04:30]. The speaker explains that..."
+INSTRUCTIONS:
+- Base your answers on the provided transcript chunks
+- Include timestamp citations INLINE using the format [MM:SS] or [HH:MM:SS]
+- Place citations immediately after the specific information they support
+- Only cite timestamps that appear in the transcript chunks below
+- Be conversational and helpful
+- For topics not in the video, politely note what the video does cover
 
 AVAILABLE TRANSCRIPT CHUNKS:
 ${context}
 
-Remember to cite specific timestamps INLINE when referencing information from the video.`;
+IMPORTANT: Only use timestamps that appear above. The video ends at ${formatTimestamp(maxSeconds)}.`;
 
-    const completion = await openai.chat.completions.create({
+    const client = getOpenAIClient();
+    
+    console.log('🚀 Calling OpenAI API...');
+    const completion = await client.chat.completions.create({
       model,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages,
       ],
       temperature: 0.7,
-      max_tokens: 800, // Reduced for faster responses
+      max_tokens: 500, // Reduced for faster responses
     });
 
-    return completion.choices[0]?.message?.content || null;
+    console.log('✅ OpenAI API response received');
+    console.log('📊 Choices:', completion.choices.length);
+    console.log('💬 Content:', completion.choices[0]?.message?.content ? 'Present' : 'Missing');
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      console.error('❌ No content in OpenAI response');
+      console.error('Full response:', JSON.stringify(completion, null, 2));
+    }
+
+    return content || null;
   } catch (error) {
-    console.error('Error generating chat response:', error);
+    console.error('❌ Error generating chat response:', error);
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    // Log more details if it's an OpenAI error
+    if (error && typeof error === 'object' && 'response' in error) {
+      const apiError = error as any;
+      console.error('API Error Response:', apiError.response?.data);
+      console.error('API Error Status:', apiError.response?.status);
+      console.error('API Error Headers:', apiError.response?.headers);
+    }
+    
     return null;
   }
 }
@@ -95,7 +164,9 @@ Remember to cite specific timestamps INLINE when referencing information from th
 // Test OpenAI connection
 export async function testOpenAIConnection(): Promise<boolean> {
   try {
-    const response = await openai.chat.completions.create({
+    const client = getOpenAIClient();
+    
+    const response = await client.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
       max_tokens: 10,
@@ -125,7 +196,7 @@ function formatTimestamp(seconds: number): string {
 export function extractCitations(content: string): Array<{ timestamp: string; position: number }> {
   const citations = [];
   // Handle both single timestamps [12:34] and ranges [12:34 - 15:67]
-  const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
+  const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?]/g;
   let match;
 
   while ((match = timestampRegex.exec(content)) !== null) {

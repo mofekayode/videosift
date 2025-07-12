@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { handleApiError, getOpenAIErrorMessage } from '@/components/ui/error';
 import { useUser, SignUpButton } from '@clerk/nextjs';
-import { Send, Loader2, AlertCircle, Clock } from 'lucide-react';
+import { Send, Loader2, AlertCircle, Clock, MessageCircle } from 'lucide-react';
 import { ChatMessage } from '@/types';
 import { generateAnonId, getStoredAnonId, setStoredAnonId } from '@/lib/session';
 import ReactMarkdown from 'react-markdown';
@@ -53,6 +53,7 @@ export function ChatInterface({
     limit: number;
     remaining: number;
   } | null>(null);
+  const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -61,20 +62,71 @@ export function ChatInterface({
 
   useEffect(() => {
     scrollToBottom();
+    console.log('Messages updated:', messages.length, 'User messages:', messages.filter(m => m.role === 'user').length);
   }, [messages]);
+
+  // Fetch today's message count
+  useEffect(() => {
+    const fetchMessageCount = async () => {
+      try {
+        console.log('🔍 Fetching message count...');
+        console.log('User signed in:', isSignedIn);
+        console.log('User ID:', user?.id);
+        console.log('AnonId:', anonId);
+        
+        const headers: any = {};
+        if (!isSignedIn && anonId) {
+          headers['x-anon-id'] = anonId;
+          console.log('📤 Sending anon_id in header:', anonId);
+        }
+        
+        const response = await fetch('/api/user/message-count', { headers });
+        const data = await response.json();
+        console.log('📊 Message count response:', data);
+        console.log('📊 Count value:', data.count);
+        console.log('📊 Setting todayMessageCount to:', data.count || 0);
+        setTodayMessageCount(data.count || 0);
+        
+        // Debug - check if state is actually updating
+        setTimeout(() => {
+          console.log('📊 After setState, todayMessageCount should be:', data.count || 0);
+        }, 100);
+      } catch (error) {
+        console.error('❌ Failed to fetch message count:', error);
+      }
+    };
+
+    // Always fetch if user is signed in, or if we have an anon ID
+    if (isSignedIn || anonId) {
+      fetchMessageCount();
+    }
+  }, [isSignedIn, user, anonId, messages]); // Re-fetch when messages change
 
   // Initialize session on component mount
   useEffect(() => {
     if (!isSignedIn) {
-      // For anonymous users, get or create anon ID
-      let storedAnonId = getStoredAnonId();
-      if (!storedAnonId) {
-        storedAnonId = generateAnonId();
-        setStoredAnonId(storedAnonId);
-      }
-      setAnonId(storedAnonId);
+      // For anonymous users, get or create device-based anon ID
+      import('./../../lib/session').then(async ({ getOrCreateDeviceAnonId }) => {
+        const deviceAnonId = await getOrCreateDeviceAnonId();
+        setAnonId(deviceAnonId);
+        console.log('🔐 Using device-based anon ID:', deviceAnonId);
+      });
+    } else if (isSignedIn && user) {
+      // User just signed in, migrate their anonymous sessions
+      import('./../../lib/migrate-sessions').then(async ({ migrateSessionsViaAPI }) => {
+        const result = await migrateSessionsViaAPI();
+        if (result.success && result.sessions_migrated && result.sessions_migrated > 0) {
+          console.log(`✅ Migrated ${result.sessions_migrated} session(s)`);
+          // Clear anonymous ID from state since user is now authenticated
+          setAnonId(null);
+          // Refresh message count after migration
+          const response = await fetch('/api/user/message-count');
+          const data = await response.json();
+          setTodayMessageCount(data.count || 0);
+        }
+      });
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, user]);
 
   // Auto-search with initial question from URL parameter
   useEffect(() => {
@@ -114,7 +166,7 @@ export function ChatInterface({
       messages.forEach(msg => {
         if (msg.content && msg.role === 'assistant') {
           // Extract original citation text from message content
-          const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
+          const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?]/g;
           let match;
           while ((match = timestampRegex.exec(msg.content)) !== null) {
             const fullMatch = match[0]; // This includes the brackets and full range
@@ -133,10 +185,23 @@ export function ChatInterface({
     if (!query.trim() || isLoading) return;
     if (!videoId) return;
 
+    // Wait for anonId if not signed in
+    let currentAnonId = anonId;
+    if (!isSignedIn && !currentAnonId) {
+      console.log('⏳ Waiting for anon ID...');
+      // Try once more to get the anon ID
+      const { getOrCreateDeviceAnonId } = await import('./../../lib/session');
+      currentAnonId = await getOrCreateDeviceAnonId();
+      setAnonId(currentAnonId);
+      console.log('🔐 Got anon ID:', currentAnonId);
+    }
+
     try {
       setConnectionError(null);
       
-      const response = await fetch('/api/chat-simple', {
+      console.log('📤 Sending chat request:', { query, videoId, sessionId, anonId: currentAnonId });
+      
+      const response = await fetch('/api/chat-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,10 +209,12 @@ export function ChatInterface({
           videoId,
           messages: messages.slice(-5), // Keep last 5 messages for context
           sessionId,
-          anonId
+          anonId: currentAnonId || anonId, // Use currentAnonId if we just fetched it
+          threadId: sessionId // For streaming endpoint
         }),
       });
 
+      console.log('📥 Response status:', response.status, response.statusText);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         
@@ -169,34 +236,126 @@ export function ChatInterface({
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      // Check if it's a streaming response
+      const contentType = response.headers.get('content-type');
+      const isStreaming = contentType?.includes('text/plain');
+      
+      if (isStreaming) {
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let assistantMessage = '';
+        
+        // Get session ID from headers
+        const newSessionId = response.headers.get('X-Session-ID');
+        if (newSessionId && !sessionId) {
+          setSessionId(newSessionId);
+        }
+        
+        const assistantMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          session_id: newSessionId || sessionId || '',
+          role: 'assistant',
+          content: '',
+          created_at: new Date().toISOString(),
+        };
+        
+        setMessages(prev => [...prev, assistantMsg]);
+        
+        if (reader) {
+          let firstChunkReceived = false;
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            assistantMessage += chunk;
+            
+            // Hide loading spinner after first chunk
+            if (!firstChunkReceived && chunk.length > 0) {
+              firstChunkReceived = true;
+              setIsLoading(false);
+            }
+            
+            // Update the last message with streaming content
+            setMessages(prev => {
+              const newMessages = [...prev];
+              newMessages[newMessages.length - 1] = {
+                ...assistantMsg,
+                content: assistantMessage
+              };
+              return newMessages;
+            });
+          }
+        }
+        
+        // Update rate limit from headers
+        const rateLimitData = {
+          hourly: {
+            limit: parseInt(response.headers.get('X-RateLimit-Limit-Hourly') || '30'),
+            remaining: parseInt(response.headers.get('X-RateLimit-Remaining-Hourly') || '29'),
+            resetTime: new Date(parseInt(response.headers.get('X-RateLimit-Reset-Hourly') || '0') * 1000)
+          },
+          daily: {
+            limit: parseInt(response.headers.get('X-RateLimit-Limit-Daily') || '30'),
+            remaining: parseInt(response.headers.get('X-RateLimit-Remaining-Daily') || '29'),
+            resetTime: new Date(parseInt(response.headers.get('X-RateLimit-Reset-Daily') || '0') * 1000)
+          }
+        };
+        updateFromResponse({ rateLimit: rateLimitData });
+      } else {
+        // Non-streaming response (cached or error)
+        const data = await response.json();
 
-      // Update session ID if returned from server
-      if (data.sessionId && !sessionId) {
-        setSessionId(data.sessionId);
+        // Update session ID if returned from server
+        if (data.sessionId && !sessionId) {
+          setSessionId(data.sessionId);
+        }
+
+        // Update rate limit data from response
+        updateFromResponse(data);
+
+        // Update session info if provided
+        if (data.sessionInfo) {
+          setSessionInfo(data.sessionInfo);
+        }
+
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          session_id: data.sessionId || '',
+          role: 'assistant',
+          content: data.response,
+          citations: data.citations,
+          created_at: new Date().toISOString(),
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsLoading(false);
       }
-
-      // Update rate limit data from response
-      updateFromResponse(data);
-
-      // Update session info if provided
-      if (data.sessionInfo) {
-        setSessionInfo(data.sessionInfo);
-      }
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        session_id: data.sessionId || '',
-        role: 'assistant',
-        content: data.response,
-        citations: data.citations,
-        created_at: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage = handleApiError(error);
+      console.error('❌ Chat error:', error);
+      console.error('❌ Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      let errorMessage = handleApiError(error);
+      
+      // Check if there's a more specific error message from the API
+      if (error instanceof Error && error.message.includes('500')) {
+        try {
+          // Try to parse the error response for more details
+          const match = error.message.match(/\{.*\}/);
+          if (match) {
+            const errorData = JSON.parse(match[0]);
+            if (errorData.details) {
+              errorMessage = `${errorData.error}: ${errorData.details}`;
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          }
+        } catch (e) {
+          // Keep the original error message if parsing fails
+        }
+      }
       
       // Set connection error for display
       setConnectionError(errorMessage);
@@ -217,6 +376,14 @@ export function ChatInterface({
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
     if (!videoId) return;
+
+    // Ensure we have anonId for anonymous users
+    let currentAnonId = anonId;
+    if (!isSignedIn && !currentAnonId) {
+      const { getOrCreateDeviceAnonId } = await import('./../../lib/session');
+      currentAnonId = await getOrCreateDeviceAnonId();
+      setAnonId(currentAnonId);
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -371,6 +538,7 @@ export function ChatInterface({
             key={message.id}
             message={message}
             onCitationClick={onCitationClick}
+            user={user}
           />
         ))}
 
@@ -415,30 +583,14 @@ export function ChatInterface({
       )}
 
       {/* Rate Limit Indicator */}
-      {rateLimitData && (
-        <div className="px-4 py-2 border-t bg-muted/20">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-3">
-              <QueryCapIndicator
-                used={rateLimitData.hourly.limit - rateLimitData.hourly.remaining}
-                limit={rateLimitData.hourly.limit}
-                timeframe="hour"
-                resetTime={rateLimitData.hourly.resetTime}
-                tier={user ? 'user' : 'anonymous'}
-                compact={true}
-              />
-              <QueryCapIndicator
-                used={rateLimitData.daily.limit - rateLimitData.daily.remaining}
-                limit={rateLimitData.daily.limit}
-                timeframe="day"
-                resetTime={rateLimitData.daily.resetTime}
-                tier={user ? 'user' : 'anonymous'}
-                compact={true}
-              />
-            </div>
+      <div className="px-4 py-3 border-t bg-background/50">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MessageCircle className="w-4 h-4" />
+            <span>You're at <span className="font-semibold text-foreground">{todayMessageCount} / 30</span> free questions today</span>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Input */}
       <div className="p-4 border-t bg-background">
@@ -475,9 +627,10 @@ export function ChatInterface({
 interface MessageBubbleProps {
   message: ChatMessage;
   onCitationClick?: (timestamp: string) => void;
+  user?: any;
 }
 
-function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
+function MessageBubble({ message, onCitationClick, user }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   const handleCitationClick = (timestamp: string) => {
@@ -487,66 +640,75 @@ function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
   };
 
   const renderContentWithCitations = (content: string, citations?: Citation[]) => {
+    // Simple approach: directly process the content to replace timestamps
+    const processTextWithTimestamps = (text: string) => {
+      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?]/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = timestampRegex.exec(text)) !== null) {
+        // Add text before timestamp
+        if (match.index > lastIndex) {
+          parts.push(text.slice(lastIndex, match.index));
+        }
+        
+        // Add clickable timestamp button
+        const startTimestamp = match[1];
+        const endTimestamp = match[2];
+        const displayText = endTimestamp 
+          ? `${startTimestamp} - ${endTimestamp}` 
+          : startTimestamp;
+        
+        parts.push(
+          <button
+            key={`ts-${match.index}-${startTimestamp}`}
+            onClick={() => handleCitationClick(startTimestamp)}
+            className="text-[#2D9CFF] hover:text-[#1E8AE6] underline mx-1 font-mono text-sm"
+            title={`Jump to ${startTimestamp}`}
+          >
+            [{displayText}]
+          </button>
+        );
+        
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(text.slice(lastIndex));
+      }
+      
+      return parts.length > 0 ? parts : text;
+    };
+
     return (
       <ReactMarkdown 
         remarkPlugins={[remarkGfm]}
         components={{
-          // Custom text component to handle timestamps
           p: ({ children }) => {
-            const processChildren = (child: any): any => {
-              if (typeof child === 'string') {
-                // Replace citation timestamps with clickable links
-                // Handle both single timestamps [12:34] and ranges [12:34 - 15:67]
-                const timestampRegex = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?))?]/g;
-                const parts = [];
-                let lastIndex = 0;
-                let match;
-
-                while ((match = timestampRegex.exec(child)) !== null) {
-                  // Add text before the timestamp
-                  if (match.index > lastIndex) {
-                    parts.push(child.slice(lastIndex, match.index));
-                  }
-
-                  // Add clickable timestamp
-                  const startTimestamp = match[1];
-                  const endTimestamp = match[2];
-                  const displayText = endTimestamp ? `${startTimestamp} - ${endTimestamp}` : startTimestamp;
-                  
-                  parts.push(
-                    <button
-                      key={`timestamp-${match.index}`}
-                      onClick={() => handleCitationClick(startTimestamp)}
-                      className="text-[#2D9CFF] hover:text-[#1E8AE6] underline mx-1"
-                      title={`Jump to ${startTimestamp}`}
-                    >
-                      [{displayText}]
-                    </button>
-                  );
-
-                  lastIndex = match.index + match[0].length;
-                }
-
-                // Add remaining text
-                if (lastIndex < child.length) {
-                  parts.push(child.slice(lastIndex));
-                }
-
-                return parts.length > 1 ? parts : child;
-              }
-              return child;
-            };
-
-            const processedChildren = Array.isArray(children) 
-              ? children.map(processChildren) 
-              : processChildren(children);
-
-            return <div className="mb-2">{processedChildren}</div>;
+            return <div className="mb-2">{React.Children.map(children, child => 
+              typeof child === 'string' ? processTextWithTimestamps(child) : child
+            )}</div>;
           },
-          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          strong: ({ children }) => {
+            return <strong className="font-semibold">{React.Children.map(children, child => 
+              typeof child === 'string' ? processTextWithTimestamps(child) : child
+            )}</strong>;
+          },
+          em: ({ children }) => {
+            return <em>{React.Children.map(children, child => 
+              typeof child === 'string' ? processTextWithTimestamps(child) : child
+            )}</em>;
+          },
           ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-          li: ({ children }) => <li className="mb-1">{children}</li>,
+          li: ({ children }) => {
+            return <li className="mb-1">{React.Children.map(children, child => 
+              typeof child === 'string' ? processTextWithTimestamps(child) : child
+            )}</li>;
+          },
+          code: ({ children }) => <code className="bg-muted px-1 py-0.5 rounded text-sm">{children}</code>,
         }}
       >
         {content}
@@ -579,8 +741,16 @@ function MessageBubble({ message, onCitationClick }: MessageBubbleProps) {
           </div>
         </div>
         {isUser && (
-          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-medium">You</span>
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {user?.imageUrl ? (
+              <img 
+                src={user.imageUrl} 
+                alt={user.fullName || 'User'} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-xs font-medium">You</span>
+            )}
           </div>
         )}
       </div>

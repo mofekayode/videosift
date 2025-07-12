@@ -111,7 +111,7 @@ export function QueryCapIndicator({
             {tier === 'anonymous' && showUpgrade && (
               <Badge variant="outline" className="text-xs">
                 <Crown className="w-2 h-2 mr-1" />
-                Upgrade
+                Beta
               </Badge>
             )}
           </div>
@@ -173,7 +173,7 @@ export function QueryCapIndicator({
               <div className="text-xs">
                 <p className="text-destructive font-medium">Message limit reached</p>
                 <p className="text-muted-foreground">
-                  Wait {formatTimeRemaining().toLowerCase()} or upgrade for more messages
+                  Wait {formatTimeRemaining().toLowerCase()} or join beta for more messages
                 </p>
               </div>
             </div>
@@ -193,7 +193,7 @@ export function QueryCapIndicator({
                   onClick={onUpgrade}
                 >
                   <Zap className="w-3 h-3 mr-1" />
-                  {tier === 'anonymous' ? 'Sign Up Free' : 'Upgrade'}
+                  {tier === 'anonymous' ? 'Sign Up Free' : 'Join Beta'}
                 </Button>
               </div>
             </div>

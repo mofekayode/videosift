@@ -15,6 +15,9 @@ export interface Video {
   thumbnail_url?: string;
   channel_id?: string;
   transcript_cached: boolean;
+  vector_store_id?: string;
+  transcript_storage_path?: string;
+  chunks_processed?: boolean;
   created_at: string;
 }
 

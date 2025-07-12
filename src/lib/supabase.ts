@@ -17,17 +17,34 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Server-side client with service role key
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Only create the admin client if we have a service role key
-// This allows the app to run in development without the service role key
-export const supabaseAdmin = supabaseServiceKey 
-  ? createClient(
-      supabaseUrl,
-      supabaseServiceKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
+// Create a lazy-loaded admin client to avoid errors during build
+export const supabaseAdmin = (() => {
+  let adminClient: ReturnType<typeof createClient> | null = null;
+  
+  return new Proxy({} as ReturnType<typeof createClient>, {
+    get(target, prop) {
+      if (!adminClient) {
+        if (!supabaseServiceKey) {
+          throw new Error(
+            'Missing SUPABASE_SERVICE_ROLE_KEY environment variable. ' +
+            'This is required for transcript storage. ' +
+            'Please add it to your .env file and restart the Next.js dev server.'
+          );
+        }
+        
+        adminClient = createClient(
+          supabaseUrl,
+          supabaseServiceKey,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          }
+        );
       }
-    )
-  : null; // Will be null in environments without the service role key
+      
+      return adminClient[prop as keyof typeof adminClient];
+    }
+  });
+})();

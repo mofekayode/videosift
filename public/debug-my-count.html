@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug My Message Count</title>
+</head>
+<body>
+    <h1>Debug My Message Count</h1>
+    <button onclick="debugCount()">Check My Count</button>
+    <div id="results"></div>
+    
+    <script>
+        async function debugCount() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Checking...</p>';
+            
+            try {
+                // First check the regular message count endpoint
+                const countResponse = await fetch('/api/user/message-count');
+                const countData = await countResponse.json();
+                results.innerHTML += `<h2>Message Count Response:</h2><pre>${JSON.stringify(countData, null, 2)}</pre>`;
+                
+                // Then check the debug endpoint
+                const debugResponse = await fetch('/api/debug/my-messages');
+                const debugData = await debugResponse.json();
+                results.innerHTML += `<h2>Debug Response:</h2><pre>${JSON.stringify(debugData, null, 2)}</pre>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

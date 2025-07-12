@@ -35,37 +35,49 @@ export function useQuota(): QuotaData {
         const userType = user ? 'user' : 'anonymous';
         
         // Set initial limits based on user type
-        const baseQuotaLimit = userType === 'anonymous' ? 20 : 30;
+        const baseQuotaLimit = 30; // Everyone gets 30 messages
         const baseChannelLimit = 1;
 
-        // For now, we'll use localStorage to track usage for demo purposes
-        // In production, this should come from your database/API
-        const storageKey = user ? `quota_${user.id}` : 'quota_anonymous';
-        const storedData = localStorage.getItem(storageKey);
-        
+        // Fetch real message count from API
         let quotaUsed = 0;
         let channelsUsed = 0;
 
-        if (storedData) {
-          try {
-            const parsed = JSON.parse(storedData);
-            quotaUsed = parsed.quotaUsed || 0;
-            channelsUsed = parsed.channelsUsed || 0;
-          } catch (error) {
-            console.error('Failed to parse stored quota data:', error);
+        try {
+          const headers: any = {};
+          
+          // For anonymous users, get anon ID from localStorage
+          if (!user) {
+            const anonId = localStorage.getItem('mindsift_anon_id');
+            if (anonId) {
+              headers['x-anon-id'] = anonId;
+            }
           }
-        }
-
-        // Reset quota if it's a new day
-        const lastResetKey = user ? `last_reset_${user.id}` : 'last_reset_anonymous';
-        const lastReset = localStorage.getItem(lastResetKey);
-        const today = new Date().toDateString();
-        
-        if (lastReset !== today) {
-          quotaUsed = 0;
-          localStorage.setItem(lastResetKey, today);
-          const updatedData = { quotaUsed: 0, channelsUsed };
-          localStorage.setItem(storageKey, JSON.stringify(updatedData));
+          
+          console.log('🔍 useQuota: Fetching message count, user:', user?.id);
+          const response = await fetch('/api/user/message-count', { headers });
+          if (response.ok) {
+            const data = await response.json();
+            console.log('📊 useQuota: Message count response:', data);
+            quotaUsed = data.count || 0;
+          } else {
+            console.error('❌ useQuota: Failed to fetch message count, status:', response.status);
+          }
+        } catch (error) {
+          console.error('Failed to fetch message count from API:', error);
+          
+          // Fallback to localStorage if API fails
+          const storageKey = user ? `quota_${user.id}` : 'quota_anonymous';
+          const storedData = localStorage.getItem(storageKey);
+          
+          if (storedData) {
+            try {
+              const parsed = JSON.parse(storedData);
+              quotaUsed = parsed.quotaUsed || 0;
+              channelsUsed = parsed.channelsUsed || 0;
+            } catch (error) {
+              console.error('Failed to parse stored quota data:', error);
+            }
+          }
         }
 
         setQuotaData({

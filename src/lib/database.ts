@@ -121,173 +121,173 @@ export async function updateVideoTranscriptStatus(videoId: string, cached: boole
   }
 }
 
-// Video chunk operations
-export async function createVideoChunks(chunks: Omit<VideoChunk, 'id' | 'created_at'>[]): Promise<boolean> {
-  try {
-    const { error } = await supabaseAdmin
-      .from('video_chunks')
-      .insert(chunks);
-    
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error creating video chunks:', error);
-    return false;
-  }
-}
+// Video chunk operations - DEPRECATED: Using OpenAI vector stores instead
+// export async function createVideoChunks(chunks: Omit<VideoChunk, 'id' | 'created_at'>[]): Promise<boolean> {
+//   try {
+//     const { error } = await supabaseAdmin
+//       .from('video_chunks')
+//       .insert(chunks);
+//     
+//     if (error) throw error;
+//     return true;
+//   } catch (error) {
+//     console.error('Error creating video chunks:', error);
+//     return false;
+//   }
+// }
 
-// Quick version - creates chunks without embeddings for immediate chat access
-export async function createVideoChunksQuick(chunks: Array<{
-  video_id: string;
-  channel_id?: string;
-  start_sec: number;
-  end_sec: number;
-  text: string;
-  embedding: null;
-}>): Promise<boolean> {
-  try {
-    const { error } = await supabaseAdmin
-      .from('video_chunks')
-      .insert(chunks);
-    
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error creating quick video chunks:', error);
-    return false;
-  }
-}
+// Quick version - creates chunks without embeddings for immediate chat access - DEPRECATED
+// export async function createVideoChunksQuick(chunks: Array<{
+//   video_id: string;
+//   channel_id?: string;
+//   start_sec: number;
+//   end_sec: number;
+//   text: string;
+//   embedding: null;
+// }>): Promise<boolean> {
+//   try {
+//     const { error } = await supabaseAdmin
+//       .from('video_chunks')
+//       .insert(chunks);
+//     
+//     if (error) throw error;
+//     return true;
+//   } catch (error) {
+//     console.error('Error creating quick video chunks:', error);
+//     return false;
+//   }
+// }
 
-// Get chunks for a video (used for background embedding processing)
-export async function getVideoChunks(videoId: string): Promise<Array<{
-  id: string;
-  text: string;
-  embedding: number[] | null;
-}>> {
-  try {
-    const { data, error } = await supabase
-      .from('video_chunks')
-      .select('id, text, embedding')
-      .eq('video_id', videoId);
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching video chunks:', error);
-    return [];
-  }
-}
+// Get chunks for a video (used for background embedding processing) - DEPRECATED
+// export async function getVideoChunks(videoId: string): Promise<Array<{
+//   id: string;
+//   text: string;
+//   embedding: number[] | null;
+// }>> {
+//   try {
+//     const { data, error } = await supabase
+//       .from('video_chunks')
+//       .select('id, text, embedding')
+//       .eq('video_id', videoId);
+//     
+//     if (error) throw error;
+//     return data || [];
+//   } catch (error) {
+//     console.error('Error fetching video chunks:', error);
+//     return [];
+//   }
+// }
 
-// Update a chunk with its embedding
-export async function updateVideoChunkEmbedding(chunkId: string, embedding: number[]): Promise<boolean> {
-  try {
-    const { error } = await supabaseAdmin
-      .from('video_chunks')
-      .update({ embedding })
-      .eq('id', chunkId);
-    
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error updating chunk embedding:', error);
-    return false;
-  }
-}
+// Update a chunk with its embedding - DEPRECATED
+// export async function updateVideoChunkEmbedding(chunkId: string, embedding: number[]): Promise<boolean> {
+//   try {
+//     const { error } = await supabaseAdmin
+//       .from('video_chunks')
+//       .update({ embedding })
+//       .eq('id', chunkId);
+//     
+//     if (error) throw error;
+//     return true;
+//   } catch (error) {
+//     console.error('Error updating chunk embedding:', error);
+//     return false;
+//   }
+// }
 
-// Simple function to get all transcript chunks for a video (no embeddings)
-export async function getVideoTranscript(youtubeId: string): Promise<Array<{
-  id: string;
-  text: string;
-  start_sec: number;
-  end_sec: number;
-}>> {
-  try {
-    // First, get the video record by YouTube ID
-    const video = await getVideoByYouTubeId(youtubeId);
-    if (!video) {
-      console.log(`Video not found for YouTube ID: ${youtubeId}`);
-      return [];
-    }
+// Simple function to get all transcript chunks for a video (no embeddings) - DEPRECATED: Use vector stores
+// export async function getVideoTranscript(youtubeId: string): Promise<Array<{
+//   id: string;
+//   text: string;
+//   start_sec: number;
+//   end_sec: number;
+// }>> {
+//   try {
+//     // First, get the video record by YouTube ID
+//     const video = await getVideoByYouTubeId(youtubeId);
+//     if (!video) {
+//       console.log(`Video not found for YouTube ID: ${youtubeId}`);
+//       return [];
+//     }
 
-    // Then get the transcript chunks using the internal video ID
-    const { data, error } = await supabase
-      .from('video_chunks')
-      .select('id, text, start_sec, end_sec')
-      .eq('video_id', video.id)
-      .order('start_sec', { ascending: true });
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching video transcript:', error);
-    return [];
-  }
-}
+//     // Then get the transcript chunks using the internal video ID
+//     const { data, error } = await supabase
+//       .from('video_chunks')
+//       .select('id, text, start_sec, end_sec')
+//       .eq('video_id', video.id)
+//       .order('start_sec', { ascending: true });
+//     
+//     if (error) throw error;
+//     return data || [];
+//   } catch (error) {
+//     console.error('Error fetching video transcript:', error);
+//     return [];
+//   }
+// }
 
-export async function searchVideoChunks(
-  videoId: string,
-  embedding: number[],
-  limit: number = 20
-): Promise<VideoChunk[]> {
-  try {
-    console.log(`🔍 Searching video chunks for videoId: ${videoId}, embedding length: ${embedding.length}`);
-    
-    // First, let's try a simple query to get ALL chunks for this video to test
-    const { data: allChunks, error: simpleError } = await supabase
-      .from('video_chunks')
-      .select('*')
-      .eq('video_id', videoId)
-      .limit(limit);
-    
-    if (simpleError) {
-      console.error('Simple query error:', simpleError);
-    } else {
-      console.log(`📊 Simple query found ${allChunks?.length || 0} chunks for videoId: ${videoId}`);
-    }
-    
-    // Try the RPC function
-    const { data, error } = await supabase.rpc('search_video_chunks', {
-      video_id: videoId,
-      query_embedding: embedding,
-      match_threshold: 0.7,
-      match_count: limit
-    });
-    
-    if (error) {
-      console.error('Supabase RPC error:', error);
-      console.log('🔄 Falling back to simple search without embeddings...');
-      // Fallback to simple search if RPC fails
-      return allChunks || [];
-    }
-    
-    console.log(`📊 RPC search found ${data?.length || 0} chunks`);
-    return data || [];
-  } catch (error) {
-    console.error('Error searching video chunks:', error);
-    return [];
-  }
-}
+// export async function searchVideoChunks(
+//   videoId: string,
+//   embedding: number[],
+//   limit: number = 20
+// ): Promise<VideoChunk[]> {
+//   try {
+//     console.log(`🔍 Searching video chunks for videoId: ${videoId}, embedding length: ${embedding.length}`);
+//     
+//     // First, let's try a simple query to get ALL chunks for this video to test
+//     const { data: allChunks, error: simpleError } = await supabase
+//       .from('video_chunks')
+//       .select('*')
+//       .eq('video_id', videoId)
+//       .limit(limit);
+//     
+//     if (simpleError) {
+//       console.error('Simple query error:', simpleError);
+//     } else {
+//       console.log(`📊 Simple query found ${allChunks?.length || 0} chunks for videoId: ${videoId}`);
+//     }
+//     
+//     // Try the RPC function
+//     const { data, error } = await supabase.rpc('search_video_chunks', {
+//       video_id: videoId,
+//       query_embedding: embedding,
+//       match_threshold: 0.7,
+//       match_count: limit
+//     });
+//     
+//     if (error) {
+//       console.error('Supabase RPC error:', error);
+//       console.log('🔄 Falling back to simple search without embeddings...');
+//       // Fallback to simple search if RPC fails
+//       return allChunks || [];
+//     }
+//     
+//     console.log(`📊 RPC search found ${data?.length || 0} chunks`);
+//     return data || [];
+//   } catch (error) {
+//     console.error('Error searching video chunks:', error);
+//     return [];
+//   }
+// }
 
-export async function searchChannelChunks(
-  channelId: string,
-  embedding: number[],
-  limit: number = 20
-): Promise<VideoChunk[]> {
-  try {
-    const { data, error } = await supabase.rpc('search_channel_chunks', {
-      channel_id: channelId,
-      query_embedding: embedding,
-      match_threshold: 0.7,
-      match_count: limit
-    });
-    
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error searching channel chunks:', error);
-    return [];
-  }
-}
+// export async function searchChannelChunks(
+//   channelId: string,
+//   embedding: number[],
+//   limit: number = 20
+// ): Promise<VideoChunk[]> {
+//   try {
+//     const { data, error } = await supabase.rpc('search_channel_chunks', {
+//       channel_id: channelId,
+//       query_embedding: embedding,
+//       match_threshold: 0.7,
+//       match_count: limit
+//     });
+//     
+//     if (error) throw error;
+//     return data || [];
+//   } catch (error) {
+//     console.error('Error searching channel chunks:', error);
+//     return [];
+//   }
+// }
 
 // Channel operations
 export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>): Promise<Channel | null> {
@@ -478,14 +478,38 @@ export async function createChatSession(
   userId?: string, 
   anonId?: string, 
   channelId?: string,
-  videoIds?: string[]
+  videoIds?: string[],
+  deviceInfo?: {
+    deviceFingerprint?: string;
+    clientIp?: string;
+    userAgent?: string;
+  }
 ): Promise<ChatSession | null> {
+  console.log('📝 Creating chat session with data:', {
+    user_id: userId,
+    anon_id: anonId,
+    video_id: videoIds?.[0]
+  });
+  
+  const sessionData: any = {
+    user_id: userId || null,
+    anon_id: anonId || null
+  };
+  
+  // Add device tracking info if provided
+  if (deviceInfo) {
+    if (deviceInfo.deviceFingerprint) {
+      sessionData.device_fingerprint = deviceInfo.deviceFingerprint;
+    }
+    if (deviceInfo.clientIp) {
+      sessionData.client_ip = deviceInfo.clientIp;
+    }
+    if (deviceInfo.userAgent) {
+      sessionData.user_agent = deviceInfo.userAgent;
+    }
+  }
+  
   try {
-    const sessionData: any = {
-      user_id: userId || null,
-      anon_id: anonId || null
-    };
-    
     // Handle different session types
     if (channelId) {
       sessionData.channel_id = channelId;
@@ -497,16 +521,20 @@ export async function createChatSession(
       sessionData.video_ids = JSON.stringify(videoIds);
     }
     
-    const { data, error } = await supabaseAdmin
+    console.log('📝 Creating chat session with data:', sessionData);
+    
+    const { data, error } = await supabase
       .from('chat_sessions')
       .insert([sessionData])
       .select()
       .single();
     
     if (error) throw error;
+    console.log('✅ Chat session created:', data?.id);
     return data;
   } catch (error) {
     console.error('Error creating chat session:', error);
+    console.error('Session data attempted:', sessionData);
     return null;
   }
 }
@@ -562,7 +590,9 @@ export async function getChatMessagesBySession(sessionId: string): Promise<ChatM
 
 export async function saveChatMessage(sessionId: string, role: 'user' | 'assistant', content: string, citations?: any[]): Promise<ChatMessage | null> {
   try {
-    const { data, error } = await supabaseAdmin
+    console.log('💬 Saving chat message:', { sessionId, role, contentLength: content.length });
+    
+    const { data, error } = await supabase
       .from('chat_messages')
       .insert([{
         session_id: sessionId,
@@ -574,6 +604,7 @@ export async function saveChatMessage(sessionId: string, role: 'user' | 'assista
       .single();
     
     if (error) throw error;
+    console.log('✅ Chat message saved:', data?.id);
     return data;
   } catch (error) {
     console.error('Error saving chat message:', error);
@@ -655,38 +686,54 @@ export async function getUserChatSessions(userId: string): Promise<Array<{
   messageCount: number;
 }>> {
   try {
-    const { data, error } = await supabase
+    // First get the sessions
+    const { data: sessions, error } = await supabase
       .from('chat_sessions')
-      .select(`
-        id,
-        video_id,
-        created_at,
-        updated_at,
-        videos (
-          youtube_id,
-          title,
-          thumbnail_url
-        )
-      `)
+      .select('*')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false })
       .limit(50);
     
     if (error) throw error;
     
-    // Get message counts for each session
-    const sessionsWithCounts = await Promise.all(
-      (data || []).map(async (session) => {
+    // Process each session to get video details and message counts
+    const sessionsWithDetails = await Promise.all(
+      (sessions || []).map(async (session) => {
+        let video = null;
+        
+        if (session.video_id) {
+          // First try to get video by UUID
+          const { data: videoByUuid } = await supabase
+            .from('videos')
+            .select('youtube_id, title, thumbnail_url')
+            .eq('id', session.video_id)
+            .single();
+          
+          if (videoByUuid) {
+            video = videoByUuid;
+          } else {
+            // If not found, try by YouTube ID (for legacy sessions)
+            const { data: videoByYoutubeId } = await supabase
+              .from('videos')
+              .select('youtube_id, title, thumbnail_url')
+              .eq('youtube_id', session.video_id)
+              .single();
+            
+            video = videoByYoutubeId;
+          }
+        }
+        
         const messageCount = await getChatMessageCount(session.id);
+        
         return {
           ...session,
-          video: session.videos,
+          video,
           messageCount
         };
       })
     );
     
-    return sessionsWithCounts;
+    return sessionsWithDetails;
   } catch (error) {
     console.error('Error fetching user chat sessions:', error);
     return [];

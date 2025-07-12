@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,10 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { QuotaDashboard } from '@/components/dashboard/QuotaDashboard';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { ChannelSelector } from '@/components/channels/ChannelSelector';
 import { BetaMessaging } from '@/components/messaging/BetaMessaging';
+import { ChatHistory } from '@/components/chat/ChatHistory';
 import { useQuota } from '@/hooks/useQuota';
 import Link from 'next/link';
 
@@ -27,6 +29,23 @@ export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const [activeTab, setActiveTab] = useState('overview');
   const { quotaUsed, quotaLimit, channelsUsed, channelLimit, userType } = useQuota();
+  const [todayMessageCount, setTodayMessageCount] = useState(0);
+
+  useEffect(() => {
+    const fetchMessageCount = async () => {
+      try {
+        const response = await fetch('/api/user/message-count');
+        const data = await response.json();
+        setTodayMessageCount(data.count);
+      } catch (error) {
+        console.error('Failed to fetch message count:', error);
+      }
+    };
+
+    if (user) {
+      fetchMessageCount();
+    }
+  }, [user]);
 
   if (!isLoaded) {
     return (
@@ -112,9 +131,9 @@ export default function DashboardPage() {
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">12</div>
+                  <div className="text-2xl font-bold">{todayMessageCount}</div>
                   <p className="text-xs text-muted-foreground">
-                    +20% from yesterday
+                    {30 - todayMessageCount} remaining today
                   </p>
                 </CardContent>
               </Card>
@@ -209,39 +228,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Your latest interactions
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Chatted about AI video</p>
-                      <p className="text-xs text-muted-foreground">2 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <Users className="h-4 w-4 text-green-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Channel processing completed</p>
-                      <p className="text-xs text-muted-foreground">1 day ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Account created</p>
-                      <p className="text-xs text-muted-foreground">3 days ago</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <RecentActivity />
           </TabsContent>
 
           <TabsContent value="usage">
@@ -268,18 +255,7 @@ export default function DashboardPage() {
                   View and continue your previous conversations
                 </p>
               </div>
-              <Card>
-                <CardContent className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Chat History Coming Soon</h3>
-                    <p className="text-muted-foreground max-w-md mx-auto">
-                      We're building a comprehensive chat history feature that will let you 
-                      view, search, and continue your previous conversations.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <ChatHistory />
             </div>
           </TabsContent>
         </Tabs>

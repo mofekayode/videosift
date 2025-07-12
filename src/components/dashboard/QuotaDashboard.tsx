@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useUser, SignInButton } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 import { 
   MessageSquare, 
   Users, 
@@ -13,7 +14,8 @@ import {
   Calendar,
   Crown,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Star
 } from 'lucide-react';
 
 interface UsageStats {
@@ -44,6 +46,76 @@ export function QuotaDashboard() {
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [todayMessageCount, setTodayMessageCount] = useState(0);
+  const [waitlistStatus, setWaitlistStatus] = useState<{
+    onWaitlist: boolean;
+    position: number | null;
+    loading: boolean;
+  }>({
+    onWaitlist: false,
+    position: null,
+    loading: true
+  });
+
+  const checkWaitlistStatus = async () => {
+    try {
+      const email = user?.emailAddresses[0]?.emailAddress;
+      if (!email) {
+        setWaitlistStatus({ onWaitlist: false, position: null, loading: false });
+        return;
+      }
+
+      const response = await fetch(`/api/waitlist/status?email=${encodeURIComponent(email)}`);
+      const data = await response.json();
+      
+      setWaitlistStatus({
+        onWaitlist: data.onWaitlist,
+        position: data.position,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Failed to check waitlist status:', error);
+      setWaitlistStatus({ onWaitlist: false, position: null, loading: false });
+    }
+  };
+
+  const handleJoinWaitlist = async () => {
+    const email = user?.emailAddresses[0]?.emailAddress;
+    
+    if (!user || !email) {
+      toast.error("Please sign in to join the waitlist");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/waitlist/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setWaitlistStatus({
+          onWaitlist: true,
+          position: data.position,
+          loading: false
+        });
+        
+        toast.success(`You've joined the waitlist! You're #${data.position} in line.`, {
+          duration: 4000,
+        });
+      } else {
+        toast.error(data.error || 'Failed to join waitlist');
+      }
+    } catch (error) {
+      console.error('Failed to join waitlist:', error);
+      toast.error('Failed to join waitlist. Please try again.');
+    }
+  };
 
   const fetchUsageStats = async () => {
     try {
@@ -90,6 +162,13 @@ export function QuotaDashboard() {
   useEffect(() => {
     if (user) {
       fetchUsageStats();
+      checkWaitlistStatus();
+      
+      // Also fetch real message count
+      fetch('/api/user/message-count')
+        .then(res => res.json())
+        .then(data => setTodayMessageCount(data.count))
+        .catch(err => console.error('Failed to fetch message count:', err));
     }
   }, [user]);
 
@@ -180,7 +259,7 @@ export function QuotaDashboard() {
         <div className="flex items-center gap-2">
           <Badge variant={isPremium ? "default" : "secondary"} className="gap-1">
             {isPremium && <Crown className="w-3 h-3" />}
-            {isPremium ? "Premium" : "Free"}
+            {isPremium ? "Pro" : "Beta"}
           </Badge>
           <Button onClick={fetchUsageStats} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4" />
@@ -194,36 +273,6 @@ export function QuotaDashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
-              Chat Messages (Hourly)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Used</span>
-                <span className={`text-sm font-medium ${getUsageColor(
-                  usageStats.chat.hourly.limit - usageStats.chat.hourly.remaining,
-                  usageStats.chat.hourly.limit
-                )}`}>
-                  {usageStats.chat.hourly.limit - usageStats.chat.hourly.remaining} / {usageStats.chat.hourly.limit}
-                </span>
-              </div>
-              <Progress 
-                value={(usageStats.chat.hourly.limit - usageStats.chat.hourly.remaining) / usageStats.chat.hourly.limit * 100}
-                className="h-2"
-              />
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                {formatTimeRemaining(usageStats.chat.hourly.resetTime)}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
               Chat Messages (Daily)
             </CardTitle>
           </CardHeader>
@@ -232,14 +281,14 @@ export function QuotaDashboard() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Used</span>
                 <span className={`text-sm font-medium ${getUsageColor(
-                  usageStats.chat.daily.limit - usageStats.chat.daily.remaining,
-                  usageStats.chat.daily.limit
+                  todayMessageCount,
+                  30
                 )}`}>
-                  {usageStats.chat.daily.limit - usageStats.chat.daily.remaining} / {usageStats.chat.daily.limit}
+                  {todayMessageCount} / 30
                 </span>
               </div>
               <Progress 
-                value={(usageStats.chat.daily.limit - usageStats.chat.daily.remaining) / usageStats.chat.daily.limit * 100}
+                value={(todayMessageCount / 30) * 100}
                 className="h-2"
               />
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -249,10 +298,7 @@ export function QuotaDashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-
-      {/* Channel Processing (for signed users) */}
+         {/* Channel Processing (for signed users) */}
       {usageStats.channelProcess && (
         <Card>
           <CardHeader className="pb-3">
@@ -283,21 +329,47 @@ export function QuotaDashboard() {
           </CardContent>
         </Card>
       )}
+      </div>
 
-      {/* Upgrade Prompt */}
+      {/* Beta/Upgrade Prompt */}
       {!isPremium && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <Crown className="w-5 h-5 text-primary mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-medium text-primary mb-1">Upgrade to Premium</h3>
+                <h3 className="font-medium text-primary mb-1">Join Beta</h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Get 5x more chat messages, unlimited channels, and priority processing
+                  Get early access to Pro features with 50% off for 2 months when we launch
                 </p>
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Upgrade Now
-                </Button>
+                {!user ? (
+                  <SignInButton mode="modal">
+                    <Button size="sm" className="bg-primary hover:bg-primary/90">
+                      <Star className="h-3 w-3 mr-1" />
+                      Sign in to Join Waitlist
+                    </Button>
+                  </SignInButton>
+                ) : waitlistStatus.loading ? (
+                  <Button size="sm" disabled className="bg-primary hover:bg-primary/90">
+                    Loading...
+                  </Button>
+                ) : waitlistStatus.onWaitlist ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 gap-1">
+                      <Users className="h-3 w-3" />
+                      #{waitlistStatus.position} in line
+                    </Badge>
+                  </div>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={handleJoinWaitlist}
+                  >
+                    <Star className="h-3 w-3 mr-1" />
+                    Join Waitlist
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>

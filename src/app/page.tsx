@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 
 export default function Home() {
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
   const [url, setUrl] = useState('');
   const [firstQuestion, setFirstQuestion] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -145,6 +145,13 @@ export default function Home() {
     try {
       // Handle channel URLs differently
       if (isChannel && !isVideo) {
+        // Check if user is signed in for channel processing
+        if (!isSignedIn) {
+          setError('Please sign in to index YouTube channels');
+          setIsProcessing(false);
+          return;
+        }
+        
         // Process channel
         const response = await fetch('/api/channel/process', {
           method: 'POST',
@@ -352,11 +359,14 @@ export default function Home() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="youtube-url" className="text-sm font-medium">
-                Paste YouTube Link (Video or Channel)
+                Paste YouTube Link {isSignedIn ? '(Video or Channel)' : ''}
               </label>
               <Input
                 id="youtube-url"
-                placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/@channel"
+                placeholder={isSignedIn 
+                  ? "https://www.youtube.com/watch?v=... or https://www.youtube.com/@channel"
+                  : "https://www.youtube.com/watch?v=..."
+                }
                 type="url"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
@@ -479,36 +489,41 @@ export default function Home() {
               ) : videoPreview ? (
                 'Start Chatting'
               ) : isValidYouTubeChannelUrl(url) && !isValidYouTubeUrl(url) ? (
-                'Index Channel'
+                isSignedIn ? 'Index Channel' : 'Sign In to Index Channel'
               ) : (
                 'Start Chatting'
               )}
             </Button>
             
             <div className="text-center space-y-3">
-              {/* Sign in button - only for non-signed-in users */}
-              {!isSignedIn && (
-                <div className="flex justify-center">
-                  <SignInButton mode="modal">
-                    <Button variant="secondary" size="sm" className="text-sm">
-                      Sign in to search channels & save chats
-                    </Button>
-                  </SignInButton>
-                </div>
-              )}
+              {/* Only render auth-dependent content after mount to avoid hydration issues */}
+              {isMounted && (
+                <>
+                  {/* Sign in button - only for non-signed-in users */}
+                  {!user && (
+                    <div className="flex justify-center">
+                      <SignInButton mode="modal">
+                        <Button variant="secondary" size="sm" className="text-sm">
+                          Sign in to search channels & save chats
+                        </Button>
+                      </SignInButton>
+                    </div>
+                  )}
 
-              {/* Channels section - only for signed-in users */}
-              {isSignedIn && (
-                <div className="flex justify-center">
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="text-sm"
-                    onClick={() => router.push('/dashboard')}
-                  >
-                    Manage Channels & History
-                  </Button>
-                </div>
+                  {/* Channels section - only for signed-in users */}
+                  {user && (
+                    <div className="flex justify-center">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="text-sm"
+                        onClick={() => router.push('/dashboard')}
+                      >
+                        Manage Channels & History
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
               
               <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">

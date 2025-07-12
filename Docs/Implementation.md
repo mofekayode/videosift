@@ -110,6 +110,10 @@ Progress ring animates around the Send button as credits burn. A tiny ⓘ icon n
 - [x] Show waitlist position instead of join button for existing members
 - [x] Update roadmap with multimodal search and proper timeline
 - [x] Fix badge hover states to use appropriate color variations
+- [x] Add channel deletion (soft delete) functionality
+- [x] Implement test mode to only index 3 videos for channel processing
+- [x] Fix channel URL validation to accept dots in channel names
+- [x] Fix "Failed to create channel record" error by ensuring proper UUID handling between Clerk and Supabase
 
 
 

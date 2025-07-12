@@ -91,40 +91,39 @@ export default function WatchPage() {
       setVideoData(data.video);
       updateProcessingStep(0, 'completed');
 
-      // Step 2: Check and download transcript if needed
-      if (!data.video.transcript_cached) {
-        updateProcessingStep(1, 'active');
-        setProcessingStep('Downloading transcript...');
-        
-        const transcriptResponse = await fetch('/api/video/transcript-quick', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoId: data.video.youtube_id }),
-        });
+      // Step 2: Check and process transcript
+      // Always check/process transcript to ensure vector store exists
+      updateProcessingStep(1, 'active');
+      setProcessingStep('Processing transcript...');
+      
+      const transcriptResponse = await fetch('/api/video/transcript-quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: data.video.youtube_id }),
+      });
 
-        if (!transcriptResponse.ok) {
-          updateProcessingStep(1, 'error');
-          throw new Error('Failed to download transcript');
-        }
-
-        updateProcessingStep(1, 'completed');
-        
-        // Step 3: Process content
-        updateProcessingStep(2, 'active');
-        setProcessingStep('Processing content for search...');
-        
-        // Simulate processing time for better UX
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        updateProcessingStep(2, 'completed');
-        
-        // Update video data to reflect cached transcript
-        setVideoData(prev => prev ? { ...prev, transcript_cached: true } : null);
-      } else {
-        // Transcript already cached, mark remaining steps as completed
-        updateProcessingStep(1, 'completed');
-        updateProcessingStep(2, 'completed');
+      if (!transcriptResponse.ok) {
+        const errorData = await transcriptResponse.json().catch(() => ({}));
+        updateProcessingStep(1, 'error');
+        throw new Error(errorData.error || 'Failed to process transcript');
       }
+
+      const transcriptData = await transcriptResponse.json();
+      console.log('Transcript response:', transcriptData);
+      
+      updateProcessingStep(1, 'completed');
+      
+      // Step 3: Process content
+      updateProcessingStep(2, 'active');
+      setProcessingStep('Processing content for search...');
+      
+      // Simulate processing time for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateProcessingStep(2, 'completed');
+      
+      // Update video data to reflect cached transcript
+      setVideoData(prev => prev ? { ...prev, transcript_cached: true } : null);
 
     } catch (error) {
       console.error('Video loading error:', error);

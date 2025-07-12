@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Message Flow</title>
+</head>
+<body>
+    <h1>Test Message Flow</h1>
+    <button onclick="testFlow()">Send Test Message</button>
+    <div id="results"></div>
+    
+    <script>
+        async function testFlow() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing message flow...</p>';
+            
+            // Get or create anon ID
+            let anonId = localStorage.getItem('mindsift_anon_id');
+            if (!anonId) {
+                anonId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+                localStorage.setItem('mindsift_anon_id', anonId);
+            }
+            results.innerHTML += `<p>Anon ID: ${anonId}</p>`;
+            
+            try {
+                // Send a test message
+                const chatResponse = await fetch('/api/chat-simple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: 'Test message at ' + new Date().toISOString(),
+                        videoId: 'gdvOJJCUXmI',  // A test video ID
+                        messages: [],
+                        anonId: anonId
+                    })
+                });
+                
+                const chatData = await chatResponse.json();
+                results.innerHTML += `<h3>Chat Response:</h3><pre>${JSON.stringify(chatData, null, 2)}</pre>`;
+                
+                // Now check message count
+                const countResponse = await fetch('/api/user/message-count', {
+                    headers: { 'x-anon-id': anonId }
+                });
+                
+                const countData = await countResponse.json();
+                results.innerHTML += `<h3>Message Count:</h3><pre>${JSON.stringify(countData, null, 2)}</pre>`;
+                
+                // Check debug info
+                const debugResponse = await fetch('/api/debug/sessions');
+                const debugData = await debugResponse.json();
+                results.innerHTML += `<h3>Debug Sessions:</h3><pre>${JSON.stringify(debugData, null, 2)}</pre>`;
+                
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
