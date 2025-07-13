@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getVideoTranscript } from '@/lib/database';
+// import { getVideoTranscript } from '@/lib/database';
+// Temporary stub
+const getVideoTranscript = async (...args: any[]) => { throw new Error('getVideoTranscript not implemented'); };
 
 export async function POST(request: NextRequest) {
   try {

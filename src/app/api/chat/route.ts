@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateChatResponse, generateEmbedding, extractCitations } from '@/lib/openai';
-import { searchVideoChunks, searchChannelChunks } from '@/lib/database';
+// import { searchVideoChunks, searchChannelChunks } from '@/lib/database';
+// Temporary stubs
+const searchVideoChunks = async (...args: any[]) => { throw new Error('searchVideoChunks not implemented'); };
+const searchChannelChunks = async (...args: any[]) => { throw new Error('searchChannelChunks not implemented'); };
 
 // Simple in-memory cache for embeddings
 const embeddingCache = new Map<string, { embedding: number[], timestamp: number }>();

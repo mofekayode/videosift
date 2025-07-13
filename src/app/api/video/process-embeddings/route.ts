@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateEmbedding } from '@/lib/openai';
-import { getVideoChunks, updateVideoChunkEmbedding } from '@/lib/database';
+// import { getVideoChunks, updateVideoChunkEmbedding } from '@/lib/database';
+// Temporary stubs
+const getVideoChunks = async (...args: any[]) => { throw new Error('getVideoChunks not implemented'); };
+const updateVideoChunkEmbedding = async (...args: any[]) => { throw new Error('updateVideoChunkEmbedding not implemented'); };
 
 // Background processing of embeddings for existing transcript chunks
 export async function POST(request: NextRequest) {

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate progress and ETA for each channel
-    const channelsWithProgress = (activeChannels || []).map(item => {
+    const channelsWithProgress = (activeChannels || []).map((item: any) => {
       const progress = item.total_videos > 0 
         ? (item.videos_processed / item.total_videos) * 100 
         : 0;

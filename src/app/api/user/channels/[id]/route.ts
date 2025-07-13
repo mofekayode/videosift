@@ -5,8 +5,9 @@ import { ensureUserExists } from '@/lib/user-sync';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const { userId } = await auth();
     
@@ -26,7 +27,7 @@ export async function DELETE(
       );
     }
 
-    const channelId = params.id;
+    const channelId = id;
 
     // Verify the channel belongs to the user
     const { data: channel, error: fetchError } = await supabase

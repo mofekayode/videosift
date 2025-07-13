@@ -166,7 +166,7 @@ export function BetaMessaging({
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-gray-600" />
             <p className="text-sm text-gray-500">
-              You're at <span className="font-bold">{quotaUsed} / {quotaLimit}</span> free questions today
+              You&apos;re at <span className="font-bold">{quotaUsed} / {quotaLimit}</span> free questions today
             </p>
           </div>
         </CardContent>

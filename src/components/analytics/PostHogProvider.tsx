@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { initPostHog, trackPageView, identifyUser, resetUser } from '@/lib/posthog';
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
+function PostHogProviderInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useUser();
@@ -40,4 +40,17 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   return <>{children}</>;
+}
+
+export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  // Initialize PostHog immediately without tracking
+  useEffect(() => {
+    initPostHog();
+  }, []);
+
+  return (
+    <Suspense fallback={<>{children}</>}>
+      <PostHogProviderInner>{children}</PostHogProviderInner>
+    </Suspense>
+  );
 }

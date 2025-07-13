@@ -3,7 +3,11 @@ import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/user-sync';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const { userId } = await auth();
     
@@ -23,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
-    const channelId = params.id;
+    const channelId = id;
     
     // Fetch channel details with ownership check and include videos
     const { data: channel, error } = await supabase

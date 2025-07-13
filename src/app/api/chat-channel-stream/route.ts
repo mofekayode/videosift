@@ -172,9 +172,9 @@ export async function POST(request: NextRequest) {
     const chunksPerVideo = Math.max(2, Math.floor(10 / channelVideos.length)); // Distribute chunks across videos
     
     // Search all videos in parallel for better performance
-    const searchPromises = channelVideos.map(async (video) => {
+    const searchPromises = channelVideos.map(async (video: any) => {
       try {
-        const chunks = await hybridChunkSearch(video.id, message, chunksPerVideo);
+        const chunks = await hybridChunkSearch(video.id as string, message, chunksPerVideo);
         
         // Add video context to each chunk
         return chunks.map(chunk => ({
@@ -217,12 +217,12 @@ export async function POST(request: NextRequest) {
           chunks: []
         };
       }
-      acc[videoKey].chunks.push(chunk.text);
+      acc[videoKey].chunks.push(chunk.text || '');
       
       // Extract timestamps from this chunk and map them to the video
       const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
       let match;
-      while ((match = timestampRegex.exec(chunk.text)) !== null) {
+      while ((match = timestampRegex.exec(chunk.text || '')) !== null) {
         const timestamp = match[1];
         timestampToVideo[timestamp] = {
           videoId: chunk.video_youtube_id,

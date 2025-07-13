@@ -112,7 +112,7 @@ export function RoadmapModal({ trigger }: RoadmapModalProps) {
                 <CardTitle className="text-lg">Currently in Beta</CardTitle>
               </div>
               <CardDescription>
-                We're actively building the future of video intelligence. Your feedback helps shape what comes next!
+                We&apos;re actively building the future of video intelligence. Your feedback helps shape what comes next!
               </CardDescription>
             </CardHeader>
           </Card>

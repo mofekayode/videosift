@@ -296,7 +296,7 @@ export default function ChannelChatPage() {
                     Ask questions about any topic across all {channel.video_count} videos in this channel.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    When videos are referenced in responses, they'll appear here.
+                    When videos are referenced in responses, they&apos;ll appear here.
                   </p>
                 </div>
               ) : (

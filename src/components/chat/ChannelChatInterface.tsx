@@ -299,9 +299,9 @@ export function ChannelChatInterface({ channel }: ChannelChatInterfaceProps) {
               Get answers with specific video references and timestamps.
             </p>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>💡 Try asking: "What are the main topics covered in this channel?"</p>
-              <p>🔍 Or: "Find videos about [specific topic]"</p>
-              <p>📊 Or: "Summarize the key insights from recent videos"</p>
+              <p>💡 Try asking: &quot;What are the main topics covered in this channel?&quot;</p>
+              <p>🔍 Or: &quot;Find videos about [specific topic]&quot;</p>
+              <p>📊 Or: &quot;Summarize the key insights from recent videos&quot;</p>
             </div>
           </div>
         )}

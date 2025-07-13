@@ -857,7 +857,7 @@ export function ChatInterface({
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MessageCircle className="w-4 h-4" />
-            <span>You're at <span className="font-semibold text-foreground">{todayMessageCount} / 30</span> free questions today</span>
+            <span>You&apos;re at <span className="font-semibold text-foreground">{todayMessageCount} / 30</span> free questions today</span>
           </div>
         </div>
       </div>
