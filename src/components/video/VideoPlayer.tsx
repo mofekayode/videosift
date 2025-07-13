@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 interface VideoPlayerProps {
   videoId: string;
   onTimeUpdate?: (time: number) => void;
+  onReady?: () => void;
   className?: string;
 }
 
@@ -22,13 +23,15 @@ declare global {
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ 
   videoId, 
-  onTimeUpdate, 
+  onTimeUpdate,
+  onReady, 
   className = ''
 }, ref) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -58,7 +61,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
           },
           events: {
             onReady: () => {
+              console.log('YouTube player ready');
               setIsReady(true);
+              onReady?.();
             },
             onStateChange: (event: any) => {
               // Handle state changes for time tracking
@@ -107,31 +112,27 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
         playerRef.current.destroy();
       }
     };
-  }, [videoId, onTimeUpdate]);
-
-  // Only seek when explicitly requested via seekTo method
-  // Remove automatic seeking based on currentTime prop changes
+  }, [videoId, onTimeUpdate, onReady]);
 
   const seekTo = (time: number) => {
-    if (isReady && playerRef.current && typeof playerRef.current.seekTo === 'function') {
+    console.log('seekTo called with time:', time);
+    if (playerRef.current && playerRef.current.seekTo) {
       console.log('Seeking to:', time);
       playerRef.current.seekTo(time, true);
       
       // Auto-play after seeking
-      setTimeout(() => {
-        if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
-          playerRef.current.playVideo();
-        }
-      }, 300);
+      if (playerRef.current.playVideo) {
+        playerRef.current.playVideo();
+      }
     } else {
-      console.warn('Cannot seek: player not ready or seekTo not available');
+      console.warn('Cannot seek: player not ready');
     }
   };
   
   // Expose seekTo method to parent component
   useImperativeHandle(ref, () => ({
     seekTo
-  }), [isReady]);
+  }), []);
 
   const play = () => {
     if (isReady && playerRef.current) {

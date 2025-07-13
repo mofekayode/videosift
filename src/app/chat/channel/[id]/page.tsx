@@ -38,7 +38,7 @@ export default function ChannelChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [referencedVideos, setReferencedVideos] = useState<ReferencedVideo[]>([]);
-  const [currentVideo, setCurrentVideo] = useState<{ videoId: string; timestamp: number } | null>(null);
+  const [currentVideo, setCurrentVideo] = useState<{ videoId: string; timestamp: number; _key?: number } | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [channelVideos, setChannelVideos] = useState<any[]>([]);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
@@ -49,15 +49,22 @@ export default function ChannelChatPage() {
     return () => console.log('ChannelChatPage unmounted at', new Date().toISOString());
   }, []);
   
-  // Seek video when currentVideo timestamp changes
+  // Simple direct seeking when currentVideo changes
   useEffect(() => {
     if (currentVideo && videoPlayerRef.current) {
-      // Small delay to ensure player is ready
-      setTimeout(() => {
-        videoPlayerRef.current?.seekTo(currentVideo.timestamp);
-      }, 100);
+      console.log('Current video changed, seeking to:', currentVideo.timestamp);
+      // Wait a bit for player to be ready if video just changed
+      const delay = 2500; // 1 second delay to ensure player is ready
+      const seekTimer = setTimeout(() => {
+        if (videoPlayerRef.current) {
+          console.log('Executing seek to:', currentVideo.timestamp);
+          videoPlayerRef.current.seekTo(currentVideo.timestamp);
+        }
+      }, delay);
+      
+      return () => clearTimeout(seekTimer);
     }
-  }, [currentVideo?.timestamp]);
+  }, [currentVideo]);
   
   // Fetch channel videos
   useEffect(() => {
@@ -308,6 +315,9 @@ export default function ChannelChatPage() {
                         ref={videoPlayerRef}
                         key={currentVideo.videoId}
                         videoId={currentVideo.videoId}
+                        onReady={() => {
+                          console.log('Video player ready callback for video:', currentVideo.videoId);
+                        }}
                         onTimeUpdate={() => {}}
                         className="w-full"
                       />
@@ -324,7 +334,11 @@ export default function ChannelChatPage() {
                     <ReferencedVideosList 
                       videos={referencedVideos}
                       currentVideo={currentVideo}
-                      onVideoSelect={(videoId, timestamp) => setCurrentVideo({ videoId, timestamp })}
+                      onVideoSelect={(videoId, timestamp) => {
+                        console.log('Video selected from ReferencedVideosList:', videoId, 'at', timestamp);
+                        // Always create a new object to ensure useEffect triggers
+                        setCurrentVideo({ videoId, timestamp, _key: Date.now() });
+                      }}
                     />
                   </div>
                 </div>
@@ -364,7 +378,8 @@ export default function ChannelChatPage() {
                         }
                         
                         console.log('Setting current video:', video.videoId, 'at', seconds, 'seconds');
-                        setCurrentVideo({ videoId: video.videoId, timestamp: seconds });
+                        // Always create a new object to ensure useEffect triggers
+                        setCurrentVideo({ videoId: video.videoId, timestamp: seconds, _key: Date.now() });
                         break;
                       }
                     }
