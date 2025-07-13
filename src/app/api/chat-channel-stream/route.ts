@@ -5,7 +5,7 @@ import { OpenAI } from 'openai';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { hybridChunkSearch } from '@/lib/rag-search';
 import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
-import { createChatSession, saveChatMessage, getChatMessageCount } from '@/lib/database';
+import { createChatSession, saveChatMessage, getChatMessageCount, getChatMessagesBySession } from '@/lib/database';
 import { trackApiError } from '@/lib/error-tracking';
 import { logger, LogCategory, logApiRequest } from '@/lib/logger';
 
@@ -247,45 +247,64 @@ export async function POST(request: NextRequest) {
       return acc;
     }, {} as Record<string, string>);
 
-    const systemPrompt = `You are a helpful AI assistant that answers questions about YouTube channel content based on transcripts from multiple videos. 
+    const systemPrompt = `You are an AI assistant with comprehensive knowledge of this YouTube channel's content. You have watched and analyzed every video in this channel, understanding not just what was said, but the visual context, demonstrations, and nuances of each video.
 
 CRITICAL RULES FOR CITATIONS:
-1. ALWAYS use timestamps when citing content: [MM:SS] or [M:SS]
-2. Use the EXACT timestamps from the transcript chunks you're referencing
-3. Mention which video the information comes from
+1. ALWAYS use timestamps when referencing specific moments: [MM:SS] or [M:SS]
+2. Use the EXACT timestamps from the video segments you're referencing
+3. Mention which video the information comes from naturally in your response
 4. Never make up or guess timestamps
 5. DO NOT use generic ranges like [0:00 - 3:27] - be SPECIFIC
 6. Only cite the actual moment where the information appears
-7. NEVER cite the beginning of a video (0:00-0:30) unless you're quoting something specific from those seconds
-8. If you can't find a specific timestamp for a claim, don't make the claim
+7. NEVER cite the beginning of a video (0:00-0:30) unless something specific happens in those seconds
+8. If you can't pinpoint when something was shown or discussed, don't make the claim
 
 When answering:
-- Be concise and direct
-- Cite specific timestamps from the transcripts
-- Mention the video title when switching between videos
-- Focus on answering the user's question
+- Speak as if you've watched these videos, not read transcripts
+- Reference what you "saw" or what was "shown" in the videos
+- Cite specific moments with timestamps
+- Naturally mention which video when switching between them
+- Focus on answering the user's question with insights from the videos
 
 GOOD citation examples:
-- "The speaker mentions at [2:45] that..."
-- "In the video about X, they explain [1:23:45] how..."
+- "The creator demonstrates at [2:45] how to..."
+- "In the video about X, you can see at [1:23:45] that..."
+- "This is explained really well at [5:12] where they show..."
 
 BAD citation examples (NEVER DO THIS):
 - "[0:00 - 3:27]" (too broad, starts at beginning)
 - "[0:00]" (lazy, just the start)
-- "[0:00 - 0:16]" (generic beginning reference)
+- "The transcript mentions..." (never say transcript!)
 
-Available videos in this channel:
+Videos in this channel:
 ${Object.entries(videoGroups).map(([id, { title }]) => `- ${title}`).join('\n')}
 
-Here is the transcript content from the channel:
+Video content and moments:
 
 ${context}`;
     
+    // Load previous messages from session for context
+    let previousMessages: Array<{role: 'user' | 'assistant', content: string}> = [];
+    if (!currentSessionId.startsWith('temp_')) {
+      try {
+        const chatHistory = await getChatMessagesBySession(currentSessionId);
+        // Only include the last 10 messages to avoid token limits
+        previousMessages = chatHistory.slice(-10).map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        console.log(`📜 Loaded ${previousMessages.length} previous messages for context`);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    }
+
     const stream = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `${message}\n\nPlease cite specific videos and timestamps when answering.` }
+        ...previousMessages,
+        { role: 'user', content: `${message}\n\nPlease reference specific videos and timestamps when answering.` }
       ],
       stream: true,
       temperature: 0.3,

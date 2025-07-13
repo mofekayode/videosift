@@ -11,6 +11,7 @@ import { useUser, SignUpButton } from '@clerk/nextjs';
 import { Send, Loader2, AlertCircle, Clock, MessageCircle, Video, PlayCircle } from 'lucide-react';
 import { ChatMessage } from '@/types';
 import { generateAnonId, getStoredAnonId, setStoredAnonId } from '@/lib/session';
+import { getChatMessagesBySession } from '@/lib/database';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { QueryCapIndicator } from '@/components/ui/query-cap-indicator';
@@ -20,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 interface ChatInterfaceProps {
   videoId?: string;
   channelId?: string;
+  sessionId?: string;
   onCitationClick?: (timestamp: string) => void;
   className?: string;
   initialQuestion?: string;
@@ -46,7 +48,8 @@ interface ReferencedVideo {
 
 export function ChatInterface({ 
   videoId, 
-  channelId, 
+  channelId,
+  sessionId: propSessionId, 
   onCitationClick, 
   className = '',
   initialQuestion,
@@ -61,7 +64,7 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [autoSearchExecuted, setAutoSearchExecuted] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(propSessionId || null);
   const [anonId, setAnonId] = useState<string | null>(null);
   const [referencedVideos, setReferencedVideos] = useState<Map<string, ReferencedVideo>>(new Map());
   const [channelVideos, setChannelVideos] = useState<any[]>([]);
@@ -77,6 +80,28 @@ export function ChatInterface({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Load previous messages when continuing a session
+  useEffect(() => {
+    if (propSessionId && messages.length === 0) {
+      console.log('Loading previous messages for session:', propSessionId);
+      getChatMessagesBySession(propSessionId).then((previousMessages) => {
+        if (previousMessages.length > 0) {
+          console.log('Loaded', previousMessages.length, 'previous messages');
+          setMessages(previousMessages);
+          // Update session info with correct message count
+          const userMessageCount = previousMessages.filter(m => m.role === 'user').length;
+          setSessionInfo({
+            messageCount: userMessageCount,
+            limit: 30, // Default daily limit
+            remaining: Math.max(0, 30 - userMessageCount)
+          });
+        }
+      }).catch(error => {
+        console.error('Failed to load previous messages:', error);
+      });
+    }
+  }, [propSessionId]);
 
   useEffect(() => {
     scrollToBottom();

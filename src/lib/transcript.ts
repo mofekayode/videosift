@@ -10,7 +10,7 @@ export async function downloadTranscript(videoId: string): Promise<TranscriptSeg
     console.log('✅ Raw transcript received:', transcript ? `${transcript.length} segments` : 'null/undefined');
     
     if (!transcript || transcript.length === 0) {
-      throw new Error('No transcript available for this video. The video may not have captions or may be private.');
+      throw new Error('Unable to analyze this video. The video may not have captions enabled or may be private.');
     }
     
     console.log(`✅ Downloaded ${transcript.length} transcript segments`);
@@ -37,7 +37,7 @@ export async function downloadTranscript(videoId: string): Promise<TranscriptSeg
     
     // Provide more specific error messages
     if (error.message?.includes('Could not get transcript')) {
-      throw new Error('This video does not have captions available. Only videos with captions can be processed.');
+      throw new Error('This video cannot be analyzed. Only videos with captions enabled can be processed.');
     } else if (error.message?.includes('Video unavailable')) {
       throw new Error('This video is unavailable. It may be private, deleted, or restricted in your region.');
     } else if (error.message?.includes('fetch failed') || error.message?.includes('ENOTFOUND')) {
@@ -46,7 +46,7 @@ export async function downloadTranscript(videoId: string): Promise<TranscriptSeg
       throw new Error('YouTube is temporarily blocking requests. Please try again in a few minutes.');
     }
     
-    throw new Error(`Failed to download transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Failed to analyze video: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

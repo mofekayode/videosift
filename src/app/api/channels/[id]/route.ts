@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/user-sync';
+import { cacheManager, CacheManager, CACHE_CONFIG } from '@/lib/cache';
 
 export async function GET(
   request: NextRequest,
@@ -29,6 +30,19 @@ export async function GET(
 
     const channelId = id;
     
+    // Check cache first
+    const cacheKey = `${CacheManager.channelDataKey(channelId)}:${user.id}`;
+    const cachedData = await cacheManager.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('✅ Channel data served from cache');
+      return NextResponse.json({
+        success: true,
+        channel: cachedData,
+        cached: true
+      });
+    }
+    
     // Fetch channel details with ownership check and include videos
     const { data: channel, error } = await supabase
       .from('channels')
@@ -55,9 +69,13 @@ export async function GET(
       );
     }
     
+    // Cache the result
+    await cacheManager.set(cacheKey, channel, CACHE_CONFIG.channel_data);
+    
     return NextResponse.json({
       success: true,
-      channel
+      channel,
+      cached: false
     });
     
   } catch (error) {

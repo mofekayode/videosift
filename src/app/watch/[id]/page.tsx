@@ -28,6 +28,7 @@ function WatchPageContent() {
   const searchParams = useSearchParams();
   const videoId = params.id as string;
   const initialQuestion = searchParams.get('q');
+  const sessionId = searchParams.get('session');
   const [isLoadingVideo, setIsLoadingVideo] = useState(false);
   const loadVideoCalledRef = useRef(false);
   
@@ -75,6 +76,9 @@ function WatchPageContent() {
       return;
     }
     
+    const performanceStart = performance.now();
+    const timings: Record<string, number> = {};
+    
     try {
       setIsLoadingVideo(true);
       setIsProcessing(true);
@@ -84,6 +88,7 @@ function WatchPageContent() {
       setProcessingSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
       
       // Step 1: Load video metadata
+      const metadataStart = performance.now();
       updateProcessingStep(0, 'active');
       setProcessingStep('Loading video metadata...');
       
@@ -101,16 +106,22 @@ function WatchPageContent() {
       const { data } = await metadataResponse.json();
       setVideoData(data.video);
       updateProcessingStep(0, 'completed');
+      timings.metadata = performance.now() - metadataStart;
 
-      // Step 2: Process transcript
+      // Step 2: Process transcript - Start immediately after we have video ID
+      const transcriptStart = performance.now();
       updateProcessingStep(1, 'active');
       setProcessingStep('Processing transcript...');
       
-      const transcriptResponse = await fetch('/api/video/transcript-quick', {
+      // Start transcript processing in parallel (non-blocking)
+      const transcriptPromise = fetch('/api/video/transcript-quick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoId: data.video.youtube_id }),
       });
+      
+      // Wait for transcript to complete
+      const transcriptResponse = await transcriptPromise;
 
       if (!transcriptResponse.ok) {
         const errorData = await transcriptResponse.json().catch(() => ({}));
@@ -127,19 +138,31 @@ function WatchPageContent() {
         console.log('Transcript response:', transcriptData);
         updateProcessingStep(1, 'completed');
       }
+      timings.transcript = performance.now() - transcriptStart;
 
       
       // Step 3: Process content
+      const processingStart = performance.now();
       updateProcessingStep(2, 'active');
       setProcessingStep('Processing content for search...');
       
-      // Simulate processing time for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small delay for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       updateProcessingStep(2, 'completed');
+      timings.processing = performance.now() - processingStart;
       
       // Update video data to reflect cached transcript
       setVideoData(prev => prev ? { ...prev, transcript_cached: true } : null);
+      
+      // Log total time and breakdown
+      const totalTime = performance.now() - performanceStart;
+      console.log('=== WATCH PAGE PERFORMANCE BREAKDOWN ===');
+      console.log(`Total time: ${totalTime.toFixed(0)}ms`);
+      console.log(`- Metadata API: ${timings.metadata.toFixed(0)}ms (${((timings.metadata/totalTime) * 100).toFixed(1)}%)`);
+      console.log(`- Transcript API: ${timings.transcript.toFixed(0)}ms (${((timings.transcript/totalTime) * 100).toFixed(1)}%)`);
+      console.log(`- Processing: ${timings.processing.toFixed(0)}ms (${((timings.processing/totalTime) * 100).toFixed(1)}%)`);
+      console.log('========================================');
 
     } catch (error) {
       console.error('Video loading error:', error);
@@ -337,6 +360,7 @@ function WatchPageContent() {
             <div className="flex-1 min-h-0 lg:h-full">
               <ChatInterface
                 videoId={videoData.youtube_id}
+                sessionId={sessionId || undefined}
                 onCitationClick={handleCitationClick}
                 className="h-full"
                 initialQuestion={initialQuestion || undefined}

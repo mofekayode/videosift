@@ -56,7 +56,8 @@ export function ChatHistory() {
 
   const handleContinueChat = (session: ChatSession) => {
     if (session.video?.youtube_id) {
-      router.push(`/watch/${session.video.youtube_id}`);
+      // Pass session ID as query parameter to continue the chat
+      router.push(`/watch/${session.video.youtube_id}?session=${session.id}`);
     }
   };
 

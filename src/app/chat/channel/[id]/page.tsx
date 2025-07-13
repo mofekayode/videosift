@@ -70,6 +70,7 @@ export default function ChannelChatPage() {
   useEffect(() => {
     console.log('Fetching channel videos for: in useEffect', channel?.id);
     if (channel?.id) {
+      const videoFetchStart = performance.now();
       fetch(`/api/channels/${channel.id}/videos`)
         .then(res => {
           if (!res.ok) {
@@ -79,10 +80,12 @@ export default function ChannelChatPage() {
           return res.json();
         })
         .then(data => {
+          const videoFetchTime = performance.now() - videoFetchStart;
           console.log('Fetched channel videos:', data);
           if (data.videos && data.videos.length > 0) {
             console.log(`Found ${data.videos.length} videos:`, data.videos.map((v: any) => ({ id: v.id, youtube_id: v.youtube_id, title: v.title })));
             setChannelVideos(data.videos);
+            console.log(`=== Channel videos fetch time: ${videoFetchTime.toFixed(0)}ms ===`);
           } else {
             console.warn('No videos found for channel');
             setChannelVideos([]);
@@ -194,14 +197,20 @@ export default function ChannelChatPage() {
   }, []);
 
   const fetchChannelDetails = async () => {
+    const performanceStart = performance.now();
     try {
       setIsLoading(true);
       const response = await fetch(`/api/channels/${params.id}`);
       const data = await response.json();
+      const channelFetchTime = performance.now() - performanceStart;
 
       if (data.success) {
         console.log('Channel details:', data.channel);
         setChannel(data.channel);
+        
+        console.log('=== CHANNEL PAGE PERFORMANCE ===');
+        console.log(`Channel details fetch: ${channelFetchTime.toFixed(0)}ms`);
+        console.log('================================');
       } else {
         setError('Channel not found or access denied');
       }

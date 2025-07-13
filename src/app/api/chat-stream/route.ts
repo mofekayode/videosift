@@ -4,7 +4,7 @@ import { OpenAI } from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import { ensureUserExists } from '@/lib/user-sync';
 import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
-import { createChatSession, saveChatMessage, getChatMessageCount, getVideoByYouTubeId } from '@/lib/database';
+import { createChatSession, saveChatMessage, getChatMessageCount, getVideoByYouTubeId, getChatMessagesBySession } from '@/lib/database';
 import { trackApiError, trackRateLimitError } from '@/lib/error-tracking';
 import { logger, LogCategory, logApiRequest } from '@/lib/logger';
 import { CacheUtils } from '@/lib/cache';
@@ -202,29 +202,48 @@ export async function POST(request: NextRequest) {
       .join('\n\n---\n\n');
 
     // Create chat completion
-    const systemPrompt = `You are a helpful AI assistant that answers questions about YouTube videos based on their transcripts. 
+    const systemPrompt = `You are an AI assistant that has carefully watched and analyzed this YouTube video. You understand not just the words spoken, but the full context of what's being presented.
 
 CRITICAL RULES FOR CITATIONS:
-1. ONLY cite timestamps that you can see in the transcript below
-2. When you cite a timestamp, quote the EXACT text that appears after that timestamp
-3. Never make up or guess timestamps - only use ones directly from the transcript
-4. If you're summarizing multiple parts, cite each specific timestamp you're drawing from
-5. Format: "At [X:XX], the speaker says '...' " (use exact quotes when possible)
+1. ONLY cite timestamps for moments you've observed in the video content below
+2. When you cite a timestamp, reference what happens at that moment
+3. Never make up or guess timestamps - only use ones from the video segments provided
+4. If you're summarizing multiple parts, cite each specific moment you're drawing from
+5. Format: "At [X:XX], you can see..." or "The creator shows at [X:XX]..."
 
 When answering:
-- Be specific and accurate with citations
+- Speak as if you've watched the video, not read a transcript
+- Reference what was shown, demonstrated, or explained
 - Be conversational and helpful
 - Keep responses concise but informative
+- Never mention "transcript" - you're analyzing the video itself
 
-Here is the transcript content with timestamps:
+Video content with timestamps:
 
 ${context}`;
+
+    // Load previous messages from session for context
+    let previousMessages: Array<{role: 'user' | 'assistant', content: string}> = [];
+    if (!currentSessionId.startsWith('temp_')) {
+      try {
+        const chatHistory = await getChatMessagesBySession(currentSessionId);
+        // Only include the last 10 messages to avoid token limits
+        previousMessages = chatHistory.slice(-10).map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        console.log(`📜 Loaded ${previousMessages.length} previous messages for context`);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    }
 
     const stream = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `${query}\n\nPlease include specific timestamps from the transcript when referencing different parts of the video.` }
+        ...previousMessages,
+        { role: 'user', content: `${query}\n\nPlease include specific timestamps when referencing different parts of the video.` }
       ],
       stream: true,
       temperature: 0.3,  // Lower temperature for more accurate citations

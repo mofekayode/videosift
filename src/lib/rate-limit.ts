@@ -206,12 +206,39 @@ export async function getUsageStats(
   videoUpload: RateLimitResult;
   channelProcess?: RateLimitResult;
 }> {
-  const [chatHourly, chatDaily, videoUpload, channelProcess] = await Promise.all([
+  const [chatHourly, chatDaily, videoUpload] = await Promise.all([
     checkRateLimit(identifier, 'chat', tier, 'hour'),
     checkRateLimit(identifier, 'chat', tier, 'day'),
     checkRateLimit(identifier, 'video_upload', tier, 'day'),
-    tier !== 'anonymous' ? checkRateLimit(identifier, 'channel_process', tier, 'day') : null,
   ]);
+  
+  // For channel processing, count actual channels instead of using rate limit
+  let channelProcess = null;
+  if (tier !== 'anonymous') {
+    try {
+      // Count user's actual channels
+      const { count, error } = await supabase
+        .from('channels')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_user_id', identifier);
+      
+      const channelCount = count || 0;
+      const limit = QUOTA_CONFIG[tier].channels_per_user;
+      
+      console.log(`📊 Channel count for user ${identifier}: ${channelCount}/${limit}`);
+      
+      channelProcess = {
+        allowed: channelCount < limit,
+        limit: limit,
+        remaining: Math.max(0, limit - channelCount),
+        resetTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year (effectively never resets)
+      };
+    } catch (error) {
+      console.error('Error counting channels:', error);
+      // Fallback to regular rate limit check
+      channelProcess = await checkRateLimit(identifier, 'channel_process', tier, 'day');
+    }
+  }
   
   return {
     chat: { hourly: chatHourly, daily: chatDaily },

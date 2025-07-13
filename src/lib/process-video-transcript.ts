@@ -14,6 +14,9 @@ export interface ProcessVideoResult {
 }
 
 export async function processVideoTranscript(youtubeVideoId: string): Promise<ProcessVideoResult> {
+  const startTime = Date.now();
+  const timings: Record<string, number> = {};
+  
   try {
     console.log('⚡ Processing transcript for video:', youtubeVideoId);
     
@@ -25,7 +28,9 @@ export async function processVideoTranscript(youtubeVideoId: string): Promise<Pr
     }
     
     // Get video from database
+    const dbStart = Date.now();
     const video = await getVideoByYouTubeId(youtubeVideoId);
+    timings.dbFetch = Date.now() - dbStart;
     
     if (!video) {
       console.log('❌ Video not found in database');
