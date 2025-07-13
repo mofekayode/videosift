@@ -109,28 +109,28 @@ export function BetaMessaging({
 
   return (
     <div className="space-y-3">
-      {/* FREE BETA Banner - Only show when user is at 50% quota or more */}
-      {isAtHalfQuota && (
-        <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
+      {/* FREE BETA Banner - Always show */}
+      {true && (
+        <Card className="border-zinc-700 bg-gradient-to-r from-zinc-900 to-zinc-800">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-700 gap-1 hover:bg-purple-200 hover:text-purple-800">
+              <Badge variant="secondary" className="bg-zinc-700 text-zinc-100 gap-1 hover:bg-zinc-600 border-zinc-600">
                 <Sparkles className="h-3 w-3" />
                 FREE BETA
               </Badge>
-              <p className="text-sm font-medium text-purple-800">
+              <p className="text-sm font-medium text-zinc-100">
                 Ask up to {quotaLimit} questions per day and index 1 YouTube channel
               </p>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-purple-700">
+              <p className="text-sm text-zinc-300">
                 Pro plans launch on August 5th. Early testers get 50% off for 2 months.
               </p>
               {!user ? (
                 <SignInButton mode="modal">
                   <Button 
                     size="sm" 
-                    className="bg-purple-600 text-white hover:bg-purple-700"
+                    className="bg-zinc-100 text-zinc-900 hover:bg-white font-medium"
                   >
                     Sign in to Join Wait-list
                   </Button>
@@ -141,7 +141,7 @@ export function BetaMessaging({
                 </Button>
               ) : waitlistStatus.onWaitlist ? (
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-700 gap-1 hover:bg-green-200 hover:text-green-800">
+                  <Badge variant="secondary" className="bg-zinc-700 text-zinc-100 gap-1 border-zinc-600">
                     <Users className="h-3 w-3" />
                     #{waitlistStatus.position} in line
                   </Badge>
@@ -149,7 +149,7 @@ export function BetaMessaging({
               ) : (
                 <Button 
                   size="sm" 
-                  className="bg-purple-600 text-white hover:bg-purple-700"
+                  className="bg-zinc-100 text-zinc-900 hover:bg-white font-medium"
                   onClick={handleJoinWaitlist}
                 >
                   Join Wait-list
@@ -202,7 +202,7 @@ export function BetaMessaging({
                 </Button>
               ) : waitlistStatus.onWaitlist ? (
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-700 gap-1 hover:bg-green-200 hover:text-green-800">
+                  <Badge variant="secondary" className="bg-zinc-700 text-zinc-100 gap-1 border-zinc-600">
                     <Users className="h-3 w-3" />
                     #{waitlistStatus.position} in line
                   </Badge>
