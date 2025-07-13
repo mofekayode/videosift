@@ -8,7 +8,13 @@ import { TopBanner } from "@/components/layout/TopBanner";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "sonner";
+import { checkRequiredEnvVars } from "@/lib/check-env";
 import "./globals.css";
+
+// Check environment variables on client
+if (typeof window !== 'undefined') {
+  checkRequiredEnvVars();
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
