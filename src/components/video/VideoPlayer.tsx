@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { LoadingSpinner } from '@/components/ui/loading';
 
 interface VideoPlayerProps {
   videoId: string;
-  currentTime?: number;
   onTimeUpdate?: (time: number) => void;
   className?: string;
+}
+
+export interface VideoPlayerRef {
+  seekTo: (time: number) => void;
 }
 
 declare global {
@@ -17,18 +20,15 @@ declare global {
   }
 }
 
-export function VideoPlayer({ 
+export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ 
   videoId, 
-  currentTime = 0, 
   onTimeUpdate, 
   className = ''
-}: VideoPlayerProps) {
+}, ref) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const lastSeekedTime = useRef<number>(-1);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -109,39 +109,29 @@ export function VideoPlayer({
     };
   }, [videoId, onTimeUpdate]);
 
-  // Seek when currentTime changes and player is ready
-  useEffect(() => {
-    if (!isReady || !playerRef.current) return;
-    
-    // Only seek if time actually changed and not to 0 (unless from a citation)
-    if (currentTime !== lastSeekedTime.current && currentTime > 0) {
-      console.log('Seeking to:', currentTime);
-      
-      try {
-        if (typeof playerRef.current.seekTo === 'function') {
-          playerRef.current.seekTo(currentTime, true);
-          lastSeekedTime.current = currentTime;
-          
-          // Auto-play after seeking (when clicking citations)
-          setTimeout(() => {
-            if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
-              playerRef.current.playVideo();
-            }
-          }, 300);
-        }
-      } catch (error) {
-        console.error('Error seeking:', error);
-      }
-    }
-  }, [currentTime, isReady]);
+  // Only seek when explicitly requested via seekTo method
+  // Remove automatic seeking based on currentTime prop changes
 
   const seekTo = (time: number) => {
     if (isReady && playerRef.current && typeof playerRef.current.seekTo === 'function') {
+      console.log('Seeking to:', time);
       playerRef.current.seekTo(time, true);
+      
+      // Auto-play after seeking
+      setTimeout(() => {
+        if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+          playerRef.current.playVideo();
+        }
+      }, 300);
     } else {
       console.warn('Cannot seek: player not ready or seekTo not available');
     }
   };
+  
+  // Expose seekTo method to parent component
+  useImperativeHandle(ref, () => ({
+    seekTo
+  }), [isReady]);
 
   const play = () => {
     if (isReady && playerRef.current) {
@@ -172,7 +162,9 @@ export function VideoPlayer({
       )}
     </div>
   );
-}
+});
+
+VideoPlayer.displayName = 'VideoPlayer';
 
 // Export utilities for external control
 export const useVideoPlayer = () => {

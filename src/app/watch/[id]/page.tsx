@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useBanner } from '@/contexts/BannerContext';
 import { useParams, useSearchParams } from 'next/navigation';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { VideoPlayer, VideoPlayerRef } from '@/components/video/VideoPlayer';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export default function WatchPage() {
   const [processingStep, setProcessingStep] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const [citationTimestamps, setCitationTimestamps] = useState<string[]>([]);
   const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null);
   const { bannerVisible, setBannerVisible, showBanner } = useBanner();
@@ -161,7 +162,8 @@ export default function WatchPage() {
       seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
     }
     
-    setCurrentTime(seconds);
+    // Use ref to seek instead of setting state
+    videoPlayerRef.current?.seekTo(seconds);
     setSelectedTimestamp(timestamp);
   };
 
@@ -291,8 +293,8 @@ export default function WatchPage() {
             {/* Mobile: Fixed aspect ratio container */}
             <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r">
               <VideoPlayer 
+                ref={videoPlayerRef}
                 videoId={videoData.youtube_id}
-                currentTime={currentTime}
                 onTimeUpdate={setCurrentTime}
                 className="w-full"
               />

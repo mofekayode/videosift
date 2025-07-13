@@ -9,7 +9,7 @@ import { ArrowLeft, Users, Video, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { ChatInterface } from '@/components/chat/ChatInterface';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { VideoPlayer, VideoPlayerRef } from '@/components/video/VideoPlayer';
 import { ReferencedVideosList } from '@/components/chat/ReferencedVideosList';
 
 interface Channel {
@@ -41,12 +41,23 @@ export default function ChannelChatPage() {
   const [currentVideo, setCurrentVideo] = useState<{ videoId: string; timestamp: number } | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [channelVideos, setChannelVideos] = useState<any[]>([]);
+  const videoPlayerRef = useRef<VideoPlayerRef>(null);
   
   // Debug when component mounts/unmounts
   useEffect(() => {
     console.log('ChannelChatPage mounted at', new Date().toISOString());
     return () => console.log('ChannelChatPage unmounted at', new Date().toISOString());
   }, []);
+  
+  // Seek video when currentVideo timestamp changes
+  useEffect(() => {
+    if (currentVideo && videoPlayerRef.current) {
+      // Small delay to ensure player is ready
+      setTimeout(() => {
+        videoPlayerRef.current?.seekTo(currentVideo.timestamp);
+      }, 100);
+    }
+  }, [currentVideo?.timestamp]);
   
   // Fetch channel videos
   useEffect(() => {
@@ -294,9 +305,9 @@ export default function ChannelChatPage() {
                   {currentVideo && (
                     <div className="mb-4">
                       <VideoPlayer 
-                        key={`${currentVideo.videoId}-${currentVideo.timestamp}`}
+                        ref={videoPlayerRef}
+                        key={currentVideo.videoId}
                         videoId={currentVideo.videoId}
-                        currentTime={currentVideo.timestamp}
                         onTimeUpdate={() => {}}
                         className="w-full"
                       />

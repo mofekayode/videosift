@@ -86,7 +86,7 @@ export function ChatInterface({
     if (onMessagesUpdate) {
       onMessagesUpdate(messages);
     }
-  }, [messages, onMessagesUpdate]);
+  }, [messages]);
 
   // Extract video references from messages when in channel mode
   useEffect(() => {
@@ -257,7 +257,7 @@ export function ChatInterface({
       console.log('Calling onReferencedVideosUpdate with:', allRefs.size, 'videos');
       onReferencedVideosUpdate(allRefs);
     }
-  }, [messages, channelId, channelVideos, onReferencedVideosUpdate]);
+  }, [messages, channelId, channelVideos]);
 
   // Fetch channel videos when channelId is provided
   useEffect(() => {
@@ -416,7 +416,7 @@ export function ChatInterface({
       });
       onCitationsUpdate(allTimestamps);
     }
-  }, [messages, onCitationsUpdate]);
+  }, [messages]);
 
   const handleAutoSearch = async (query: string) => {
     if (!query.trim() || isLoading) return;
