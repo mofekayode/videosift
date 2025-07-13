@@ -4,6 +4,24 @@ import { createChannel, queueChannel, getUserByClerkId } from '@/lib/database';
 import { extractChannelId } from '@/lib/youtube';
 import { ensureUserExists } from '@/lib/user-sync';
 
+// Import the processing function
+import { processChannelQueue } from '@/lib/channel-processor';
+
+// Function to trigger channel processing in the background
+async function triggerChannelProcessing() {
+  try {
+    console.log('🚀 Triggering automatic channel processing...');
+    
+    // Call the function directly - no HTTP request needed
+    const result = await processChannelQueue();
+    console.log('✅ Processing triggered:', result);
+    
+  } catch (error) {
+    // Don't throw - this is a background task
+    console.error('❌ Error triggering processing:', error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -127,6 +145,10 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Channel queued for processing:', channel.title);
+
+    // Automatically trigger processing in the background
+    // We don't await this - let it run in the background
+    triggerChannelProcessing();
 
     return NextResponse.json({
       success: true,

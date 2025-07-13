@@ -82,7 +82,15 @@ export async function createVideo(video: Omit<Video, 'id' | 'created_at'>): Prom
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating video:', error);
+      // If it's a duplicate key error, return null so caller can handle it
+      if (error.code === '23505') {
+        console.log('⚠️ Video already exists with youtube_id:', video.youtube_id);
+        return null;
+      }
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('Error creating video:', error);
@@ -338,7 +346,18 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
   try {
     const { data, error } = await supabase
       .from('channels')
-      .select('*')
+      .select(`
+        *,
+        videos!videos_channel_id_fkey (
+          id,
+          youtube_id,
+          title,
+          thumbnail_url,
+          duration,
+          chunks_processed
+        ),
+        channel_queue!channel_queue_channel_id_fkey (*)
+      `)
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -512,7 +531,20 @@ export async function createChatSession(
   try {
     // Handle different session types
     if (channelId) {
-      sessionData.channel_id = channelId;
+      // For now, skip channel_id until migration is applied
+      console.log('📝 Channel chat session requested - using temporary session');
+      // Return a temporary session for channels until we have channel_id column
+      return {
+        id: `channel_${channelId}_${Date.now()}`,
+        user_id: userId || null,
+        anon_id: anonId || null,
+        video_id: null,
+        video_ids: null,
+        created_at: new Date().toISOString(),
+        device_fingerprint: deviceInfo?.deviceFingerprint || null,
+        client_ip: deviceInfo?.clientIp || null,
+        user_agent: deviceInfo?.userAgent || null
+      };
     } else if (videoIds && videoIds.length === 1) {
       // Single video chat
       sessionData.video_id = videoIds[0];
@@ -520,8 +552,6 @@ export async function createChatSession(
       // Multi-video chat - store as JSON
       sessionData.video_ids = JSON.stringify(videoIds);
     }
-    
-    console.log('📝 Creating chat session with data:', sessionData);
     
     const { data, error } = await supabase
       .from('chat_sessions')

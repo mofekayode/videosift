@@ -74,6 +74,7 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   created_at: string;
+  videoMapping?: Record<string, { videoId: string; title: string }>;
 }
 
 export interface Citation {

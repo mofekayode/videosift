@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,9 +28,19 @@ import Link from 'next/link';
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
-  const [activeTab, setActiveTab] = useState('overview');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'overview');
   const { quotaUsed, quotaLimit, channelsUsed, channelLimit, userType } = useQuota();
   const [todayMessageCount, setTodayMessageCount] = useState(0);
+
+  // Update active tab when URL parameter changes
+  useEffect(() => {
+    if (tabFromUrl && ['overview', 'usage', 'channels', 'history'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   useEffect(() => {
     const fetchMessageCount = async () => {
@@ -105,7 +116,13 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          // Update URL with new tab
+          const url = new URL(window.location.href);
+          url.searchParams.set('tab', value);
+          router.push(url.pathname + url.search, { scroll: false });
+        }} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="usage">Usage & Quotas</TabsTrigger>
@@ -203,7 +220,13 @@ export default function DashboardPage() {
                   <Button 
                     variant="outline" 
                     className="w-full justify-between h-auto p-4"
-                    onClick={() => setActiveTab('channels')}
+                    onClick={() => {
+                      setActiveTab('channels');
+                      // Update URL with new tab
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('tab', 'channels');
+                      router.push(url.pathname + url.search, { scroll: false });
+                    }}
                   >
                     <div className="text-left">
                       <div className="font-medium">Manage Channels</div>
@@ -215,7 +238,13 @@ export default function DashboardPage() {
                   <Button 
                     variant="outline" 
                     className="w-full justify-between h-auto p-4"
-                    onClick={() => setActiveTab('history')}
+                    onClick={() => {
+                      setActiveTab('history');
+                      // Update URL with new tab
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('tab', 'history');
+                      router.push(url.pathname + url.search, { scroll: false });
+                    }}
                   >
                     <div className="text-left">
                       <div className="font-medium">View History</div>

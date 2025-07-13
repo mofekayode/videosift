@@ -12,6 +12,34 @@ export async function processTranscriptWithChunks(
   segments: TranscriptSegment[]
 ) {
   try {
+    // Check if video is already processed
+    const { data: video, error: videoError } = await supabaseAdmin
+      .from('videos')
+      .select('chunks_processed')
+      .eq('id', videoId)
+      .single();
+    
+    if (videoError) {
+      console.error('Error checking video status:', videoError);
+    }
+    
+    if (video?.chunks_processed) {
+      console.log('⚠️ Video already has chunks processed, checking chunk count...');
+      const { count } = await supabaseAdmin
+        .from('transcript_chunks')
+        .select('*', { count: 'exact', head: true })
+        .eq('video_id', videoId);
+      
+      if (count && count > 0) {
+        console.log(`✅ Found ${count} existing chunks, skipping processing`);
+        return {
+          success: true,
+          chunkCount: count,
+          skipped: true
+        };
+      }
+    }
+    
     // 1. Store transcript in Supabase Storage
     const { path, chunks } = await storeTranscriptInStorage(videoId, segments);
     

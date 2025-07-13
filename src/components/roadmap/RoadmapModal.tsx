@@ -165,19 +165,19 @@ export function RoadmapModal({ trigger }: RoadmapModalProps) {
           </div>
 
           {/* Bottom CTA */}
-          <Card className="mt-4 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+          <Card className="mt-4 border-green-400 bg-gradient-to-r from-green-900 to-emerald-900">
             <CardContent className="pt-6">
               <div className="text-center">
-                <h3 className="font-semibold text-green-900 mb-2">
+                <h3 className="font-semibold text-green-100 mb-2">
                   Want to influence our roadmap?
                 </h3>
-                <p className="text-sm text-green-700 mb-4">
+                <p className="text-sm text-green-200 mb-4">
                   Join our community and share your ideas for new features and improvements.
                 </p>
                 <div className="flex justify-center">
                   <Button 
                     size="sm" 
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-300 hover:bg-green-500"
                     onClick={() => window.open('mailto:mofekayode@gmail.com?subject=MindSift Feedback&body=Hi! I have some feedback about MindSift:', '_blank')}
                   >
                     Send Feedback

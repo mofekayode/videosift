@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Channel Chat Component</title>
+</head>
+<body>
+  <h1>Testing Channel Chat Component</h1>
+  <p>The ChannelChatInterface component has been updated with:</p>
+  
+  <h2>Key Features:</h2>
+  <ul>
+    <li>✅ Video reference extraction from AI responses</li>
+    <li>✅ Left sidebar showing referenced videos</li>
+    <li>✅ Clickable timestamps linking to YouTube</li>
+    <li>✅ Video thumbnails and titles</li>
+  </ul>
+  
+  <h2>How it works:</h2>
+  <ol>
+    <li>When the AI mentions a video like: "In the video 'Data Analyst Interview' at [2:45]..."</li>
+    <li>The component extracts the video title and timestamp</li>
+    <li>It matches the title to videos in the channel</li>
+    <li>Shows the video in the left sidebar with clickable timestamps</li>
+  </ol>
+  
+  <h2>Functions added:</h2>
+  <pre>
+  - extractVideoReferences(): Extracts video mentions from AI response
+  - updateReferencedVideos(): Updates the sidebar state
+  - convertTimestampToSeconds(): Converts timestamps for YouTube links
+  </pre>
+  
+  <p>Navigate to <a href="http://localhost:3001/chat/channel/13f079a2-1446-46a7-adba-3a9660e36765">Channel Chat</a> to test it.</p>
+</body>
+</html>

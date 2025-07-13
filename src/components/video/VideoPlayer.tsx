@@ -21,12 +21,14 @@ export function VideoPlayer({
   videoId, 
   currentTime = 0, 
   onTimeUpdate, 
-  className = '' 
+  className = ''
 }: VideoPlayerProps) {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const lastSeekedTime = useRef<number>(-1);
 
   useEffect(() => {
     // Load YouTube IFrame API
@@ -107,26 +109,37 @@ export function VideoPlayer({
     };
   }, [videoId, onTimeUpdate]);
 
-  // Seek to specific time and auto-play
+  // Seek when currentTime changes and player is ready
   useEffect(() => {
-    if (isReady && playerRef.current && currentTime > 0) {
-      // Only seek if the time difference is significant (more than 2 seconds)
-      const currentVideoTime = playerRef.current.getCurrentTime ? Math.floor(playerRef.current.getCurrentTime()) : 0;
-      if (Math.abs(currentTime - currentVideoTime) > 2) {
-        playerRef.current.seekTo(currentTime, true);
-        // Auto-play the video after seeking
-        setTimeout(() => {
-          if (playerRef.current && playerRef.current.playVideo) {
-            playerRef.current.playVideo();
-          }
-        }, 100); // Small delay to ensure seeking is complete
+    if (!isReady || !playerRef.current) return;
+    
+    // Only seek if time actually changed and not to 0 (unless from a citation)
+    if (currentTime !== lastSeekedTime.current && currentTime > 0) {
+      console.log('Seeking to:', currentTime);
+      
+      try {
+        if (typeof playerRef.current.seekTo === 'function') {
+          playerRef.current.seekTo(currentTime, true);
+          lastSeekedTime.current = currentTime;
+          
+          // Auto-play after seeking (when clicking citations)
+          setTimeout(() => {
+            if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+              playerRef.current.playVideo();
+            }
+          }, 300);
+        }
+      } catch (error) {
+        console.error('Error seeking:', error);
       }
     }
   }, [currentTime, isReady]);
 
   const seekTo = (time: number) => {
-    if (isReady && playerRef.current) {
+    if (isReady && playerRef.current && typeof playerRef.current.seekTo === 'function') {
       playerRef.current.seekTo(time, true);
+    } else {
+      console.warn('Cannot seek: player not ready or seekTo not available');
     }
   };
 

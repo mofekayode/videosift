@@ -25,10 +25,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const channelId = params.id;
     
-    // Fetch channel details with ownership check
+    // Fetch channel details with ownership check and include videos
     const { data: channel, error } = await supabase
       .from('channels')
-      .select('*')
+      .select(`
+        *,
+        videos!videos_channel_id_fkey (
+          id,
+          youtube_id,
+          title,
+          thumbnail_url,
+          duration,
+          chunks_processed
+        )
+      `)
       .eq('id', channelId)
       .eq('owner_user_id', user.id)
       .single();

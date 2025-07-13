@@ -8,13 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { handleApiError, getOpenAIErrorMessage } from '@/components/ui/error';
 import { useUser, SignUpButton } from '@clerk/nextjs';
-import { Send, Loader2, AlertCircle, Clock, MessageCircle } from 'lucide-react';
+import { Send, Loader2, AlertCircle, Clock, MessageCircle, Video, PlayCircle } from 'lucide-react';
 import { ChatMessage } from '@/types';
 import { generateAnonId, getStoredAnonId, setStoredAnonId } from '@/lib/session';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { QueryCapIndicator } from '@/components/ui/query-cap-indicator';
 import { useRateLimit } from '@/hooks/useRateLimit';
+import { supabase } from '@/lib/supabase';
 
 interface ChatInterfaceProps {
   videoId?: string;
@@ -23,6 +24,8 @@ interface ChatInterfaceProps {
   className?: string;
   initialQuestion?: string;
   onCitationsUpdate?: (timestamps: string[]) => void;
+  onReferencedVideosUpdate?: (videos: Map<string, ReferencedVideo>) => void;
+  onMessagesUpdate?: (messages: ChatMessage[]) => void;
 }
 
 interface Citation {
@@ -31,13 +34,25 @@ interface Citation {
   video_id?: string;
 }
 
+interface ReferencedVideo {
+  videoId: string;
+  title: string;
+  citations: Array<{
+    timestamp: string;
+    text?: string;
+  }>;
+  thumbnail?: string;
+}
+
 export function ChatInterface({ 
   videoId, 
   channelId, 
   onCitationClick, 
   className = '',
   initialQuestion,
-  onCitationsUpdate
+  onCitationsUpdate,
+  onReferencedVideosUpdate,
+  onMessagesUpdate
 }: ChatInterfaceProps) {
   const { isSignedIn, user } = useUser();
   const { rateLimitData, updateFromResponse } = useRateLimit();
@@ -48,6 +63,8 @@ export function ChatInterface({
   const [autoSearchExecuted, setAutoSearchExecuted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [anonId, setAnonId] = useState<string | null>(null);
+  const [referencedVideos, setReferencedVideos] = useState<Map<string, ReferencedVideo>>(new Map());
+  const [channelVideos, setChannelVideos] = useState<any[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{
     messageCount: number;
     limit: number;
@@ -55,6 +72,7 @@ export function ChatInterface({
   } | null>(null);
   const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const migrationAttemptedRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -63,7 +81,202 @@ export function ChatInterface({
   useEffect(() => {
     scrollToBottom();
     console.log('Messages updated:', messages.length, 'User messages:', messages.filter(m => m.role === 'user').length);
-  }, [messages]);
+    
+    // Notify parent of message updates
+    if (onMessagesUpdate) {
+      onMessagesUpdate(messages);
+    }
+  }, [messages, onMessagesUpdate]);
+
+  // Extract video references from messages when in channel mode
+  useEffect(() => {
+    console.log('Video extraction effect running:', { channelId, channelVideosLength: channelVideos.length, messagesLength: messages.length });
+    if (!channelId || channelVideos.length === 0) return;
+    
+    // Only process if we have assistant messages
+    const hasAssistantMessages = messages.some(m => m.role === 'assistant' && m.content);
+    if (!hasAssistantMessages) {
+      console.log('No assistant messages to process');
+      return;
+    }
+    
+    const extractVideoReferences = (content: string): Map<string, Set<string>> => {
+      const videoRefs = new Map<string, Set<string>>();
+      
+      // Try new format first: [12:34] "Video Title"
+      const newFormatRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]\s*"([^"]+)"/g;
+      
+      // Fallback to old format: [12:34 - videoId]
+      const oldFormatRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\s*-\s*([a-zA-Z0-9_-]{11})\]/g;
+      
+      // Also try simple timestamps without video reference
+      const simpleTimestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
+      
+      console.log('Extracting video references from:', content.substring(0, 200));
+      
+      // Try new format
+      let match;
+      let foundAny = false;
+      while ((match = newFormatRegex.exec(content)) !== null) {
+        foundAny = true;
+        const startTime = match[1];
+        const endTime = match[2];
+        const videoTitle = match[3];
+        const timestamp = endTime ? `${startTime} - ${endTime}` : startTime;
+        
+        // Find video by title
+        const video = channelVideos.find(v => v.title === videoTitle);
+        if (video) {
+          const videoId = video.youtube_id;
+          if (!videoRefs.has(videoId)) {
+            videoRefs.set(videoId, new Set());
+          }
+          videoRefs.get(videoId)!.add(timestamp);
+        }
+      }
+      
+      // If no new format citations found, try old format
+      if (!foundAny) {
+        while ((match = oldFormatRegex.exec(content)) !== null) {
+          foundAny = true;
+          const startTime = match[1];
+          const endTime = match[2];
+          const videoId = match[3];
+          const timestamp = endTime ? `${startTime} - ${endTime}` : startTime;
+          
+          if (!videoRefs.has(videoId)) {
+            videoRefs.set(videoId, new Set());
+          }
+          videoRefs.get(videoId)!.add(timestamp);
+        }
+      }
+      
+      // If still no citations found, just extract timestamps and try to match with video mentions
+      if (!foundAny && channelVideos.length > 0) {
+        console.log('No formatted citations found, extracting simple timestamps');
+        const timestamps: Array<{timestamp: string, position: number}> = [];
+        
+        // Reset regex
+        simpleTimestampRegex.lastIndex = 0;
+        
+        while ((match = simpleTimestampRegex.exec(content)) !== null) {
+          const startTime = match[1];
+          const endTime = match[2];
+          const timestamp = endTime ? `${startTime} - ${endTime}` : startTime;
+          timestamps.push({ timestamp, position: match.index });
+        }
+        
+        console.log('Found timestamps:', timestamps);
+        
+        if (timestamps.length > 0) {
+          // Try to associate timestamps with videos based on nearby text mentions
+          timestamps.forEach(({ timestamp, position }) => {
+            // Look for video title mentions near this timestamp (within 200 chars)
+            const contextStart = Math.max(0, position - 200);
+            const contextEnd = Math.min(content.length, position + 200);
+            const context = content.substring(contextStart, contextEnd).toLowerCase();
+            
+            // Find which video is mentioned in the context
+            let matchedVideo = null;
+            for (const video of channelVideos) {
+              // Check if video title or parts of it appear in the context
+              const titleWords = video.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+              const matchCount = titleWords.filter((word: string) => context.includes(word)).length;
+              if (matchCount >= Math.min(2, titleWords.length)) {
+                matchedVideo = video;
+                break;
+              }
+            }
+            
+            // If we found a matching video, add the timestamp
+            if (matchedVideo) {
+              const videoId = matchedVideo.youtube_id;
+              if (!videoRefs.has(videoId)) {
+                videoRefs.set(videoId, new Set());
+              }
+              videoRefs.get(videoId)!.add(timestamp);
+            } else {
+              // If no specific video found, add to the first video as fallback
+              const firstVideo = channelVideos[0];
+              if (firstVideo) {
+                if (!videoRefs.has(firstVideo.youtube_id)) {
+                  videoRefs.set(firstVideo.youtube_id, new Set());
+                }
+                videoRefs.get(firstVideo.youtube_id)!.add(timestamp);
+              }
+            }
+          });
+        }
+      }
+      
+      console.log('Extracted references:', videoRefs);
+      return videoRefs;
+    };
+    
+    // Process all assistant messages to extract referenced videos
+    const allRefs = new Map<string, ReferencedVideo>();
+    
+    console.log('Processing messages for video references:', messages.length);
+    
+    messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        console.log('Processing assistant message:', msg.content.substring(0, 300));
+        const refs = extractVideoReferences(msg.content);
+        
+        refs.forEach((timestamps, videoId) => {
+          console.log('Processing video references:', { videoId, timestamps: Array.from(timestamps) });
+          
+          if (!allRefs.has(videoId)) {
+            // Find video info from channel videos if available
+            const videoInfo = channelVideos.find(v => v.youtube_id === videoId);
+            console.log('Found video info:', videoInfo);
+            
+            allRefs.set(videoId, {
+              videoId,
+              title: videoInfo?.title || `Video ${videoId}`,
+              thumbnail: videoInfo?.thumbnail_url || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+              citations: Array.from(timestamps).map(ts => ({ timestamp: ts }))
+            });
+          } else {
+            // Add new timestamps to existing video
+            const existing = allRefs.get(videoId)!;
+            timestamps.forEach(ts => {
+              if (!existing.citations.some(c => c.timestamp === ts)) {
+                existing.citations.push({ timestamp: ts });
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    setReferencedVideos(allRefs);
+    
+    // Notify parent component about referenced videos
+    if (onReferencedVideosUpdate) {
+      console.log('Calling onReferencedVideosUpdate with:', allRefs.size, 'videos');
+      onReferencedVideosUpdate(allRefs);
+    }
+  }, [messages, channelId, channelVideos, onReferencedVideosUpdate]);
+
+  // Fetch channel videos when channelId is provided
+  useEffect(() => {
+    if (channelId) {
+      const fetchChannelVideos = async () => {
+        try {
+          const response = await fetch(`/api/channels/${channelId}/videos`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Fetched channel videos:', data.videos);
+            setChannelVideos(data.videos || []);
+          }
+        } catch (error) {
+          console.error('Failed to fetch channel videos:', error);
+        }
+      };
+      fetchChannelVideos();
+    }
+  }, [channelId]);
 
   // Fetch today's message count
   useEffect(() => {
@@ -100,7 +313,7 @@ export function ChatInterface({
     if (isSignedIn || anonId) {
       fetchMessageCount();
     }
-  }, [isSignedIn, user, anonId, messages]); // Re-fetch when messages change
+  }, [isSignedIn, user, anonId]); // Only fetch on auth changes, not message updates
 
   // Initialize session on component mount
   useEffect(() => {
@@ -111,20 +324,44 @@ export function ChatInterface({
         setAnonId(deviceAnonId);
         console.log('🔐 Using device-based anon ID:', deviceAnonId);
       });
-    } else if (isSignedIn && user) {
-      // User just signed in, migrate their anonymous sessions
-      import('./../../lib/migrate-sessions').then(async ({ migrateSessionsViaAPI }) => {
-        const result = await migrateSessionsViaAPI();
-        if (result.success && result.sessions_migrated && result.sessions_migrated > 0) {
-          console.log(`✅ Migrated ${result.sessions_migrated} session(s)`);
-          // Clear anonymous ID from state since user is now authenticated
-          setAnonId(null);
-          // Refresh message count after migration
-          const response = await fetch('/api/user/message-count');
-          const data = await response.json();
-          setTodayMessageCount(data.count || 0);
-        }
-      });
+      // Reset migration flag when user logs out
+      migrationAttemptedRef.current = false;
+    }
+  }, [isSignedIn]);
+
+  // Handle session migration only once when user signs in
+  useEffect(() => {
+    if (isSignedIn && user && !migrationAttemptedRef.current) {
+      // Check if we have an anonymous ID to migrate from
+      const storedAnonId = localStorage.getItem('mindsift_anon_id');
+      
+      if (storedAnonId) {
+        migrationAttemptedRef.current = true;
+        console.log('🔄 Attempting session migration for newly signed-in user');
+        
+        // User just signed in, try to migrate their anonymous sessions
+        import('./../../lib/migrate-sessions').then(async ({ migrateSessionsViaAPI }) => {
+          try {
+            const result = await migrateSessionsViaAPI();
+            if (result.success && result.sessions_migrated && result.sessions_migrated > 0) {
+              console.log(`✅ Migrated ${result.sessions_migrated} session(s)`);
+              // Clear anonymous ID after successful migration
+              localStorage.removeItem('mindsift_anon_id');
+              setAnonId(null);
+              // Refresh message count after migration
+              const response = await fetch('/api/user/message-count');
+              const data = await response.json();
+              setTodayMessageCount(data.count || 0);
+            }
+          } catch (error) {
+            // Don't throw or show error to user - migration is optional
+            console.log('Session migration skipped:', error);
+          }
+        });
+      } else {
+        // No anonymous ID to migrate
+        migrationAttemptedRef.current = true;
+      }
     }
   }, [isSignedIn, user]);
 
@@ -183,7 +420,7 @@ export function ChatInterface({
 
   const handleAutoSearch = async (query: string) => {
     if (!query.trim() || isLoading) return;
-    if (!videoId) return;
+    if (!videoId && !channelId) return;
 
     // Wait for anonId if not signed in
     let currentAnonId = anonId;
@@ -199,19 +436,30 @@ export function ChatInterface({
     try {
       setConnectionError(null);
       
-      console.log('📤 Sending chat request:', { query, videoId, sessionId, anonId: currentAnonId });
+      console.log('📤 Sending chat request:', { query, videoId, channelId, sessionId, anonId: currentAnonId });
       
-      const response = await fetch('/api/chat-stream', {
+      // Use channel endpoint if channelId is provided, otherwise use regular video endpoint
+      const endpoint = channelId ? '/api/chat-channel-stream' : '/api/chat-stream';
+      const body = channelId 
+        ? {
+            message: query,
+            channelId,
+            sessionId,
+            anonId: currentAnonId || anonId
+          }
+        : {
+            query,
+            videoId,
+            messages: messages.slice(-5), // Keep last 5 messages for context
+            sessionId,
+            anonId: currentAnonId || anonId, // Use currentAnonId if we just fetched it
+            threadId: sessionId // For streaming endpoint
+          };
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query,
-          videoId,
-          messages: messages.slice(-5), // Keep last 5 messages for context
-          sessionId,
-          anonId: currentAnonId || anonId, // Use currentAnonId if we just fetched it
-          threadId: sessionId // For streaming endpoint
-        }),
+        body: JSON.stringify(body),
       });
 
       console.log('📥 Response status:', response.status, response.statusText);
@@ -252,12 +500,25 @@ export function ChatInterface({
           setSessionId(newSessionId);
         }
         
+        // Get video mapping from headers for channel chat
+        const videoMappingHeader = response.headers.get('X-Video-Mapping');
+        let videoMapping: Record<string, { videoId: string; title: string }> = {};
+        if (videoMappingHeader) {
+          try {
+            videoMapping = JSON.parse(videoMappingHeader);
+            console.log('📺 Video mapping from API:', videoMapping);
+          } catch (e) {
+            console.error('Failed to parse video mapping:', e);
+          }
+        }
+        
         const assistantMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           session_id: newSessionId || sessionId || '',
           role: 'assistant',
           content: '',
           created_at: new Date().toISOString(),
+          videoMapping // Include video mapping from headers
         };
         
         setMessages(prev => [...prev, assistantMsg]);
@@ -283,7 +544,8 @@ export function ChatInterface({
               const newMessages = [...prev];
               newMessages[newMessages.length - 1] = {
                 ...assistantMsg,
-                content: assistantMessage
+                content: assistantMessage,
+                videoMapping // Add video mapping to message
               };
               return newMessages;
             });
@@ -375,7 +637,7 @@ export function ChatInterface({
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
-    if (!videoId) return;
+    if (!videoId && !channelId) return;
 
     // Ensure we have anonId for anonymous users
     let currentAnonId = anonId;
@@ -407,6 +669,7 @@ export function ChatInterface({
       sendMessage();
     }
   };
+
 
   const retryLastMessage = () => {
     if (messages.length > 0) {
@@ -462,15 +725,21 @@ export function ChatInterface({
         {messages.length === 0 && (
           <div className="max-w-4xl mx-auto px-4 py-12 text-center">
             <div className="text-muted-foreground mb-6">
-              <h3 className="text-lg font-medium mb-2">Ask me anything about this video!</h3>
-              <p className="text-sm">I can help you understand the content, find specific information, or answer questions.</p>
+              <h3 className="text-lg font-medium mb-2">
+                {channelId ? "Ask me anything about this channel!" : "Ask me anything about this video!"}
+              </h3>
+              <p className="text-sm">
+                {channelId 
+                  ? "I can help you explore topics across all videos in this channel."
+                  : "I can help you understand the content, find specific information, or answer questions."}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const question = "What is this video about?";
+                  const question = channelId ? "What topics are covered in this channel?" : "What is this video about?";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
                     session_id: sessionId || '',
@@ -485,13 +754,13 @@ export function ChatInterface({
                 className="text-sm bg-background hover:bg-muted/50"
                 disabled={isLoading}
               >
-                What is this video about?
+                {channelId ? "Topics covered" : "What is this video about?"}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const question = "Give me the key takeaways";
+                  const question = channelId ? "What are the main themes across all videos?" : "Give me the key takeaways";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
                     session_id: sessionId || '',
@@ -506,13 +775,13 @@ export function ChatInterface({
                 className="text-sm bg-background hover:bg-muted/50"
                 disabled={isLoading}
               >
-                Key takeaways
+                {channelId ? "Main themes" : "Key takeaways"}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const question = "Summarize the main points";
+                  const question = channelId ? "Give me insights from recent videos" : "Summarize the main points";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
                     session_id: sessionId || '',
@@ -527,18 +796,19 @@ export function ChatInterface({
                 className="text-sm bg-background hover:bg-muted/50"
                 disabled={isLoading}
               >
-                Summarize
+                {channelId ? "Recent insights" : "Summarize"}
               </Button>
             </div>
           </div>
         )}
 
         {messages.map((message) => (
-          <MessageBubble
+          <MessageBubbleInternal
             key={message.id}
             message={message}
             onCitationClick={onCitationClick}
             user={user}
+            channelVideos={channelVideos}
           />
         ))}
 
@@ -630,19 +900,38 @@ interface MessageBubbleProps {
   user?: any;
 }
 
-function MessageBubble({ message, onCitationClick, user }: MessageBubbleProps) {
+interface MessageBubblePropsInternal extends MessageBubbleProps {
+  channelVideos?: any[];
+}
+
+function MessageBubbleInternal({ message, onCitationClick, user, channelVideos = [] }: MessageBubblePropsInternal) {
   const isUser = message.role === 'user';
 
-  const handleCitationClick = (timestamp: string) => {
-    if (onCitationClick) {
+  const handleCitationClick = (timestamp: string, videoId?: string) => {
+    if (videoId) {
+      // For channel citations with video ID, open in new tab
+      const firstTimestamp = timestamp.includes(' - ') ? timestamp.split(' - ')[0] : timestamp;
+      const parts = firstTimestamp.split(':').map(Number);
+      let seconds = 0;
+      
+      if (parts.length === 2) {
+        seconds = parts[0] * 60 + parts[1];
+      } else if (parts.length === 3) {
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+      
+      window.open(`https://www.youtube.com/watch?v=${videoId}&t=${seconds}s`, '_blank');
+    } else if (onCitationClick) {
+      // For regular video citations, use the callback
       onCitationClick(timestamp);
     }
   };
 
-  const renderContentWithCitations = (content: string, citations?: Citation[]) => {
+  const renderContentWithCitations = (content: string, _citations?: Citation[]) => {
     // Simple approach: directly process the content to replace timestamps
     const processTextWithTimestamps = (text: string) => {
-      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?]/g;
+      // Match both formats: [timestamp] for single video and [timestamp] "Video Title" for channels
+      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\](?:\s*"([^"]+)")?/g;
       const parts = [];
       let lastIndex = 0;
       let match;
@@ -653,19 +942,28 @@ function MessageBubble({ message, onCitationClick, user }: MessageBubbleProps) {
           parts.push(text.slice(lastIndex, match.index));
         }
         
-        // Add clickable timestamp button
+        // Extract parts
         const startTimestamp = match[1];
         const endTimestamp = match[2];
+        const videoTitle = match[3];
+        
         const displayText = endTimestamp 
           ? `${startTimestamp} - ${endTimestamp}` 
           : startTimestamp;
         
+        // Find video ID from title if in channel mode
+        let videoId: string | undefined;
+        if (videoTitle && channelVideos.length > 0) {
+          const video = channelVideos.find(v => v.title === videoTitle);
+          videoId = video?.youtube_id;
+        }
+        
         parts.push(
           <button
-            key={`ts-${match.index}-${startTimestamp}`}
-            onClick={() => handleCitationClick(startTimestamp)}
+            key={`ts-${match.index}-${startTimestamp}-${videoId || ''}`}
+            onClick={() => handleCitationClick(displayText, videoId)}
             className="text-[#2D9CFF] hover:text-[#1E8AE6] underline mx-1 font-mono text-sm"
-            title={`Jump to ${startTimestamp}`}
+            title={videoId ? `Open "${videoTitle}" at ${startTimestamp}` : `Jump to ${startTimestamp}`}
           >
             [{displayText}]
           </button>

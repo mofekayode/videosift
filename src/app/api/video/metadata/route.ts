@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Create video record in database
+      // Try to create video record in database
       video = await createVideo({
         youtube_id: metadata.id,
         title: metadata.title,
@@ -76,10 +76,18 @@ export async function POST(request: NextRequest) {
       });
       
       if (!video) {
-        return NextResponse.json(
-          { error: 'Failed to create video record' },
-          { status: 500 }
-        );
+        // If creation failed, it might be due to a race condition
+        // Try to fetch the video again
+        console.log('⚠️ Video creation failed, checking if it was created by another request...');
+        video = await getVideoByYouTubeId(videoId);
+        
+        if (!video) {
+          return NextResponse.json(
+            { error: 'Failed to create video record' },
+            { status: 500 }
+          );
+        }
+        console.log('✅ Found video created by another request');
       }
     }
     

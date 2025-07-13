@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Channel Chat UI</title>
+  <style>
+    body { font-family: system-ui; margin: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .test-section { margin: 30px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+    .code { background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; overflow-x: auto; }
+    .success { color: green; }
+    .info { color: blue; }
+    .warning { color: orange; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Channel Chat UI Test</h1>
+    
+    <div class="test-section">
+      <h2>1. Navigate to Channel Chat</h2>
+      <p>Go to: <a href="http://localhost:3001/dashboard?tab=channels" target="_blank">http://localhost:3001/dashboard?tab=channels</a></p>
+      <p class="info">ℹ️ Make sure you're signed in first</p>
+    </div>
+    
+    <div class="test-section">
+      <h2>2. Expected Channel Display</h2>
+      <p>You should see the Exponent channel with:</p>
+      <ul>
+        <li class="success">✅ Status: Ready</li>
+        <li class="success">✅ Video count: 3 videos</li>
+        <li class="success">✅ Green "Ready for chat" status</li>
+      </ul>
+    </div>
+    
+    <div class="test-section">
+      <h2>3. Click on the Channel</h2>
+      <p>When you click on the Exponent channel, you'll be redirected to the chat interface.</p>
+      <p>The chat interface should have:</p>
+      <ul>
+        <li>Main chat area on the right</li>
+        <li>Video references sidebar on the left (appears after AI mentions videos)</li>
+      </ul>
+    </div>
+    
+    <div class="test-section">
+      <h2>4. Test Questions</h2>
+      <p>Try these questions to see video references appear:</p>
+      <div class="code">
+        1. "What interview strategies are discussed across the different videos?"<br>
+        2. "Summarize the key points from each video in this channel"<br>
+        3. "What companies are mentioned in the interview videos?"
+      </div>
+      <p class="info">ℹ️ The left sidebar will populate with referenced videos as the AI mentions them</p>
+    </div>
+    
+    <div class="test-section">
+      <h2>5. Video References Sidebar</h2>
+      <p>When videos are referenced, the sidebar shows:</p>
+      <ul>
+        <li>Video thumbnail (if available)</li>
+        <li>Video title</li>
+        <li>Clickable timestamps that link to YouTube at the exact moment</li>
+        <li>"Watch video" link</li>
+      </ul>
+      <p class="success">✅ Each timestamp is clickable and opens YouTube at that exact time</p>
+    </div>
+    
+    <div class="test-section">
+      <h2>6. Email Notification</h2>
+      <p>The completion email should show:</p>
+      <ul>
+        <li class="success">✅ "3 videos indexed" (not 0)</li>
+        <li class="success">✅ Channel title: Exponent</li>
+        <li class="success">✅ Link to start chatting</li>
+      </ul>
+    </div>
+  </div>
+  
+  <script>
+    console.log('Channel Chat UI Test Guide loaded');
+    console.log('Channel ID for testing: 13f079a2-1446-46a7-adba-3a9660e36765');
+  </script>
+</body>
+</html>

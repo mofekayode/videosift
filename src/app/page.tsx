@@ -16,13 +16,14 @@ import { ChannelDropdown } from '@/components/channels/ChannelDropdown';
 import { useQuota } from '@/hooks/useQuota';
 import { trackEvent } from '@/lib/posthog';
 import { SignInButton, useUser } from '@clerk/nextjs';
-import { Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
 
 export default function Home() {
   const router = useRouter();
   const { isSignedIn, isLoaded, user } = useUser();
+  const [activeTab, setActiveTab] = useState<'video' | 'channel'>('video');
   const [url, setUrl] = useState('');
   const [firstQuestion, setFirstQuestion] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,7 +32,7 @@ export default function Home() {
   const [videoPreview, setVideoPreview] = useState<{ title: string; thumbnail: string } | null>(null);
   const [isPreprocessing, setIsPreprocessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { bannerVisible, setBannerVisible, showBanner } = useBanner();
+  const { bannerVisible, showBanner } = useBanner();
   const questionRef = useRef<HTMLTextAreaElement>(null);
   
   // Real quota data
@@ -48,10 +49,17 @@ export default function Home() {
     setVideoPreview(null);
     
     const trimmedUrl = newUrl.trim();
-    const valid = Boolean(trimmedUrl && (isValidYouTubeUrl(trimmedUrl) || isValidYouTubeChannelUrl(trimmedUrl)));
+    let valid = false;
+    
+    if (activeTab === 'video') {
+      valid = Boolean(trimmedUrl && isValidYouTubeUrl(trimmedUrl));
+    } else {
+      valid = Boolean(trimmedUrl && isValidYouTubeChannelUrl(trimmedUrl) && !isValidYouTubeUrl(trimmedUrl));
+    }
+    
     setIsValidUrl(valid);
     
-    if (valid) {
+    if (valid && activeTab === 'video') {
       // Track video URL pasted
       const videoId = extractVideoId(trimmedUrl);
       trackEvent('video_url_pasted', {
@@ -127,15 +135,20 @@ export default function Home() {
 
   const handleStartChat = async () => {
     if (!url.trim()) {
-      setError('Please enter a YouTube URL');
+      setError(activeTab === 'video' ? 'Please enter a YouTube video URL' : 'Please enter a YouTube channel URL');
       return;
     }
 
     const isVideo = isValidYouTubeUrl(url);
     const isChannel = isValidYouTubeChannelUrl(url);
 
-    if (!isVideo && !isChannel) {
-      setError('Please enter a valid YouTube video or channel URL');
+    if (activeTab === 'video' && !isVideo) {
+      setError('Please enter a valid YouTube video URL');
+      return;
+    }
+    
+    if (activeTab === 'channel' && (!isChannel || isVideo)) {
+      setError('Please enter a valid YouTube channel URL');
       return;
     }
 
@@ -219,37 +232,9 @@ export default function Home() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleStartChat();
-    }
-  };
 
   return (
     <>
-      {/* Top Banner - Fade in after 2 seconds */}
-      {bannerVisible && (
-        <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
-          showBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex-1" />
-            <p className="text-sm font-semibold text-purple-600" style={{ letterSpacing: '0.25px' }}>
-              Multi-channel search coming soon
-            </p>
-            <div className="flex-1 flex items-center justify-end">
-              <button
-                onClick={() => setBannerVisible(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Close banner"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Subtle Background Animation */}
       {isMounted && (
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -327,8 +312,8 @@ export default function Home() {
         </div>
       )}
       
-      <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 pb-20 sm:pb-4 transition-all duration-300 relative z-10 ${
-        bannerVisible && showBanner ? 'pt-16' : 'pt-4'
+      <div className={`min-h-screen flex items-start justify-center p-2 sm:p-4 transition-all duration-300 relative z-10 ${
+        bannerVisible && showBanner ? 'pt-16' : 'pt-20'
       }`}>
       <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
         <div className="text-center space-y-2 sm:space-y-4">
@@ -352,101 +337,212 @@ export default function Home() {
           userType={userType}
         />
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Get Started</CardTitle>
+        <Card className="overflow-visible">
+          <CardHeader className="pb-3">
+            <div className="flex space-x-1 border-b">
+              <button
+                onClick={() => {
+                  setActiveTab('video');
+                  setUrl('');
+                  setFirstQuestion('');
+                  setVideoPreview(null);
+                  setIsValidUrl(false);
+                  setError(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeTab === 'video'
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Chat with Video
+                {activeTab === 'video' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('channel');
+                  setUrl('');
+                  setFirstQuestion('');
+                  setVideoPreview(null);
+                  setIsValidUrl(false);
+                  setError(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                  activeTab === 'channel'
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Chat with Channel
+                {activeTab === 'channel' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="youtube-url" className="text-sm font-medium">
-                Paste YouTube Link {isSignedIn ? '(Video or Channel)' : ''}
-              </label>
-              <Input
-                id="youtube-url"
-                placeholder={isSignedIn 
-                  ? "https://www.youtube.com/watch?v=... or https://www.youtube.com/@channel"
-                  : "https://www.youtube.com/watch?v=..."
-                }
-                type="url"
-                value={url}
-                onChange={(e) => handleUrlChange(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={isProcessing}
-                className=""
-              />
-            </div>
-            
-            {/* Only show question input for video URLs, not channel URLs */}
-            {(!isValidYouTubeChannelUrl(url) || isValidYouTubeUrl(url)) && (
-              <div className="space-y-2">
-                <label htmlFor="first-question" className="text-sm font-medium">
-                  Ask Your First Question (Optional)
-                </label>
-                <Textarea
-                  ref={questionRef}
-                  id="first-question"
-                  placeholder="Ask me anything about this video"
-                  value={firstQuestion}
-                  onChange={(e) => setFirstQuestion(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleStartChat();
-                    }
-                  }}
-                  disabled={isProcessing}
-                  rows={3}
-                />
+            {activeTab === 'video' ? (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="youtube-url" className="text-sm font-medium">
+                    Paste YouTube Video Link
+                  </label>
+                  <Input
+                    id="youtube-url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    type="url"
+                    value={url}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleStartChat();
+                      }
+                    }}
+                    disabled={isProcessing}
+                    className=""
+                  />
+                </div>
                 
+                {/* Question input and preview for video tab */}
                 {isValidUrl && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        const question = 'Summarize this video';
-                        setFirstQuestion(question);
-                        handleStartChatWithQuestion(question);
-                      }}
-                      disabled={isProcessing}
-                      className="text-xs"
-                    >
-                      Summarize this video
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        const question = 'Give me the key takeaways';
-                        setFirstQuestion(question);
-                        handleStartChatWithQuestion(question);
-                      }}
-                      disabled={isProcessing}
-                      className="text-xs"
-                    >
-                      Key takeaways
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        const question = 'Explain the main points';
-                        setFirstQuestion(question);
-                        handleStartChatWithQuestion(question);
-                      }}
-                      disabled={isProcessing}
-                      className="text-xs"
-                    >
-                      Main points
-                    </Button>
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="first-question" className="text-sm font-medium">
+                        Ask Your First Question (Optional)
+                      </label>
+                      <Textarea
+                        ref={questionRef}
+                        id="first-question"
+                        placeholder="Ask me anything about this video"
+                        value={firstQuestion}
+                        onChange={(e) => setFirstQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleStartChat();
+                          }
+                        }}
+                        disabled={isProcessing}
+                        rows={3}
+                      />
+                      
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const question = 'Summarize this video';
+                            setFirstQuestion(question);
+                            handleStartChatWithQuestion(question);
+                          }}
+                          disabled={isProcessing}
+                          className="text-xs"
+                        >
+                          Summarize this video
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const question = 'Give me the key takeaways';
+                            setFirstQuestion(question);
+                            handleStartChatWithQuestion(question);
+                          }}
+                          disabled={isProcessing}
+                          className="text-xs"
+                        >
+                          Key takeaways
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const question = 'Explain the main points';
+                            setFirstQuestion(question);
+                            handleStartChatWithQuestion(question);
+                          }}
+                          disabled={isProcessing}
+                          className="text-xs"
+                        >
+                          Main points
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {videoPreview && (
+                      <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg border shadow-sm animate-in fade-in-0">
+                        <Image 
+                          src={videoPreview.thumbnail} 
+                          alt="Video thumbnail" 
+                          width={64}
+                          height={48}
+                          className="w-16 h-12 object-cover rounded shadow-sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{videoPreview.title}</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">Transcript ready. Ask away.</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {isSignedIn ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Select a Channel to Chat With
+                      </label>
+                      <ChannelDropdown 
+                        onChannelSelect={(channelId: string) => {
+                          router.push(`/chat/channel/${channelId}`);
+                        }}
+                      />
+                    </div>
+                    
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or add new channel</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label htmlFor="channel-url" className="text-sm font-medium">
+                        Add New YouTube Channel
+                      </label>
+                      <Input
+                        id="channel-url"
+                        placeholder="https://www.youtube.com/@channel or https://www.youtube.com/c/channelname"
+                        type="url"
+                        value={url}
+                        onChange={(e) => handleUrlChange(e.target.value)}
+                        onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleStartChat();
+                      }
+                    }}
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 space-y-4">
+                    <p className="text-muted-foreground">
+                      Sign in to chat with YouTube channels
+                    </p>
+                    <SignInButton mode="modal">
+                      <Button>Sign In</Button>
+                    </SignInButton>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Channel dropdown for signed-in users */}
-            {isSignedIn && (
-              <ChannelDropdown />
+              </>
             )}
 
             {error && (
@@ -454,57 +550,51 @@ export default function Home() {
                 {error}
               </div>
             )}
-            
-            {videoPreview && (
-              <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg border shadow-sm animate-in fade-in-0">
-                <Image 
-                  src={videoPreview.thumbnail} 
-                  alt="Video thumbnail" 
-                  width={64}
-                  height={48}
-                  className="w-16 h-12 object-cover rounded shadow-sm"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{videoPreview.title}</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">Transcript ready. Ask away.</p>
-                </div>
-              </div>
-            )}
 
-            <Button 
-              className="w-full h-11" 
-              onClick={handleStartChat}
-              disabled={isProcessing || !isValidUrl}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : isPreprocessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Preparing video...
-                </>
-              ) : videoPreview ? (
-                'Start Chatting'
-              ) : isValidYouTubeChannelUrl(url) && !isValidYouTubeUrl(url) ? (
-                isSignedIn ? 'Index Channel' : 'Sign In to Index Channel'
-              ) : (
-                'Start Chatting'
-              )}
-            </Button>
+            {activeTab === 'video' && isValidUrl && (
+              <Button 
+                className="w-full h-11" 
+                onClick={handleStartChat}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Start Chatting'
+                )}
+              </Button>
+            )}
+            
+            {activeTab === 'channel' && isValidYouTubeChannelUrl(url) && !isValidYouTubeUrl(url) && (
+              <Button 
+                className="w-full h-11" 
+                onClick={handleStartChat}
+                disabled={isProcessing || !isSignedIn}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  isSignedIn ? 'Index Channel' : 'Sign In to Index Channel'
+                )}
+              </Button>
+            )}
             
             <div className="text-center space-y-3">
               {/* Only render auth-dependent content after mount to avoid hydration issues */}
               {isMounted && (
                 <>
-                  {/* Sign in button - only for non-signed-in users */}
-                  {!user && (
+                  {/* Sign in button - only for non-signed-in users on video tab */}
+                  {!user && activeTab === 'video' && (
                     <div className="flex justify-center">
                       <SignInButton mode="modal">
                         <Button variant="secondary" size="sm" className="text-sm">
-                          Sign in to search channels & save chats
+                          Sign in to save chats & index channels
                         </Button>
                       </SignInButton>
                     </div>
@@ -526,17 +616,19 @@ export default function Home() {
                 </>
               )}
               
-              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                <span>Need a video to try?</span>
-                <Button 
-                  variant="link" 
-                  size="sm"
-                  onClick={() => handleUrlChange('https://www.youtube.com/watch?v=BHO_glbVcIg')}
-                  className="p-0 h-auto text-sm text-primary hover:underline"
-                >
-                  Use demo video
-                </Button>
-              </div>
+              {activeTab === 'video' && (
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <span>Need a video to try?</span>
+                  <Button 
+                    variant="link" 
+                    size="sm"
+                    onClick={() => handleUrlChange('https://www.youtube.com/watch?v=BHO_glbVcIg')}
+                    className="p-0 h-auto text-sm text-primary hover:underline"
+                  >
+                    Use demo video
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users, Video, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
 import { LoadingSpinner } from '@/components/ui/loading';
-import { ChannelChatInterface } from '@/components/chat/ChannelChatInterface';
+import { ChatInterface } from '@/components/chat/ChatInterface';
+import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { ReferencedVideosList } from '@/components/chat/ReferencedVideosList';
 
 interface Channel {
   id: string;
@@ -18,18 +20,160 @@ interface Channel {
   status: string;
 }
 
+interface ReferencedVideo {
+  videoId: string;
+  title: string;
+  citations: Array<{
+    timestamp: string;
+    text?: string;
+  }>;
+  thumbnail?: string;
+}
+
 export default function ChannelChatPage() {
   const params = useParams();
   const { user } = useUser();
+  const { isLoaded: authLoaded } = useAuth();
   const [channel, setChannel] = useState<Channel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [referencedVideos, setReferencedVideos] = useState<ReferencedVideo[]>([]);
+  const [currentVideo, setCurrentVideo] = useState<{ videoId: string; timestamp: number } | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [channelVideos, setChannelVideos] = useState<any[]>([]);
+  
+  // Debug when component mounts/unmounts
+  useEffect(() => {
+    console.log('ChannelChatPage mounted at', new Date().toISOString());
+    return () => console.log('ChannelChatPage unmounted at', new Date().toISOString());
+  }, []);
+  
+  // Fetch channel videos
+  useEffect(() => {
+    console.log('Fetching channel videos for: in useEffect', channel?.id);
+    if (channel?.id) {
+      fetch(`/api/channels/${channel.id}/videos`)
+        .then(res => {
+          if (!res.ok) {
+            console.log('Failed to fetch channel videos:', res);
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          console.log('Fetched channel videos:', data);
+          if (data.videos && data.videos.length > 0) {
+            console.log(`Found ${data.videos.length} videos:`, data.videos.map((v: any) => ({ id: v.id, youtube_id: v.youtube_id, title: v.title })));
+            setChannelVideos(data.videos);
+          } else {
+            console.warn('No videos found for channel');
+            setChannelVideos([]);
+          }
+        })
+        .catch(error => {
+          console.error('Failed to fetch channel videos:', error);
+          setChannelVideos([]);
+        });
+    }
+  }, [channel]);
+
+  // Extract video references from messages
+  useEffect(() => {
+    console.log('Extracting videos from messages:', messages.length, 'Channel videos:', channelVideos.length);
+    
+    if (!messages.length) {
+      console.log('No messages to process');
+      return;
+    }
+    
+    if (!channelVideos.length) {
+      console.log('Channel videos not loaded yet, skipping extraction');
+      return;
+    }
+
+    const videoMap = new Map<string, ReferencedVideo>();
+
+    messages.forEach(msg => {
+      console.log('Processing message:', msg);
+      if (msg.role === 'assistant' && msg.content) {
+        // Use video mapping if available
+        const videoMapping = msg.videoMapping || {};
+        
+        // Extract all timestamps
+        const citationRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
+        let match;
+        
+        while ((match = citationRegex.exec(msg.content)) !== null) {
+          const timestamp = match[2] ? `${match[1]} - ${match[2]}` : match[1];
+          const startTimestamp = match[1]; // Use first timestamp for lookup
+          
+          // Check if we have a mapping for this timestamp
+          let targetVideo = null;
+          if (videoMapping[startTimestamp]) {
+            const mappedVideoId = videoMapping[startTimestamp].videoId;
+            targetVideo = channelVideos.find(v => v.youtube_id === mappedVideoId);
+          }
+          
+          // Fallback: try to find video by looking for title in nearby text
+          if (!targetVideo) {
+            console.log('No mapping found for timestamp:', startTimestamp);
+            const startIndex = Math.max(0, match.index - 200);
+            const endIndex = Math.min(msg.content.length, match.index + 200);
+            const contextText = msg.content.substring(startIndex, endIndex).toLowerCase();
+            
+            for (const video of channelVideos) {
+              if (contextText.includes(video.title.toLowerCase())) {
+                targetVideo = video;
+                break;
+              }
+            }
+          }
+          
+          // Last fallback: use first video if we have any
+          if (!targetVideo && channelVideos.length > 0) {
+            targetVideo = channelVideos[0];
+          }
+          
+          if (targetVideo) {
+            console.log('Found target video:', targetVideo);
+            if (!videoMap.has(targetVideo.youtube_id)) {
+              videoMap.set(targetVideo.youtube_id, {
+                videoId: targetVideo.youtube_id,
+                title: targetVideo.title,
+                thumbnail: targetVideo.thumbnail_url,
+                citations: []
+              });
+            }
+            
+            const videoRef = videoMap.get(targetVideo.youtube_id)!;
+            videoRef.citations.push({ timestamp });
+          }
+        }
+      }
+    });
+
+    const newRefs = Array.from(videoMap.values());
+    console.log('=== Video Extraction Debug ===');
+    console.log('Channel videos available:', channelVideos.map(v => ({ youtube_id: v.youtube_id, title: v.title })));
+    console.log('Extracted referenced videos:', newRefs);
+    console.log('Video mappings from messages:', messages.filter(m => m.videoMapping).map(m => m.videoMapping));
+    console.log('===========================');
+    setReferencedVideos(newRefs);
+  }, [messages, channelVideos]);
 
   useEffect(() => {
-    if (user && params.id) {
+    console.log('Params changed:', params.id, 'Auth loaded:', authLoaded, 'User:', user?.id);
+    // Only fetch channel details after auth has loaded and we have a user
+    if (authLoaded && user && params.id) {
+      console.log('Fetching channel details for:', params.id);
       fetchChannelDetails();
     }
-  }, [user, params.id]);
+  }, [authLoaded, user, params.id]);
+
+  const handleMessagesUpdate = useCallback((newMessages: any[]) => {
+    console.log('Messages updated from ChatInterface:', newMessages.length);
+    setMessages(newMessages);
+  }, []);
 
   const fetchChannelDetails = async () => {
     try {
@@ -38,6 +182,7 @@ export default function ChannelChatPage() {
       const data = await response.json();
 
       if (data.success) {
+        console.log('Channel details:', data.channel);
         setChannel(data.channel);
       } else {
         setError('Channel not found or access denied');
@@ -50,7 +195,18 @@ export default function ChannelChatPage() {
     }
   };
 
-  if (!user) {
+  // Show loading while Clerk is initializing
+  if (!authLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
+
+  // Only show sign-in message after auth has loaded and confirmed no user
+  if (authLoaded && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -94,35 +250,118 @@ export default function ChannelChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl font-semibold">{channel.title}</h1>
-              <p className="text-sm text-muted-foreground">
-                {channel.video_count} videos indexed • Multi-channel chat
-              </p>
-            </div>
+      <header className="border-b p-2 sm:p-4 flex items-center">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/">
+            <ArrowLeft className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back</span>
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1 ml-2 sm:ml-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-primary" />
+            <h1 className="font-semibold text-sm sm:text-lg line-clamp-1">{channel.title}</h1>
           </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Chat with {channel.video_count} videos • Ask about any topic across all videos
+          </p>
         </div>
-      </div>
+      </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardContent className="p-0">
-              <ChannelChatInterface channel={channel} />
-            </CardContent>
-          </Card>
+      <div className="flex-1 flex overflow-hidden">
+        {/* Mobile/Tablet: Stacked vertically, Desktop: Side by side */}
+        <div className="flex flex-col lg:flex-row w-full">
+          {/* Left Panel - Video Player and Referenced Videos */}
+          <div className="w-full lg:w-1/2 flex flex-col">
+            <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r h-full overflow-hidden flex flex-col">
+              {(referencedVideos.length === 0 && !currentVideo) ? (
+                <div className="bg-muted/50 rounded-lg p-8 text-center">
+                  <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Channel Chat</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Ask questions about any topic across all {channel.video_count} videos in this channel.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    When videos are referenced in responses, they'll appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col">
+                  {/* Video Player */}
+                  {currentVideo && (
+                    <div className="mb-4">
+                      <VideoPlayer 
+                        key={`${currentVideo.videoId}-${currentVideo.timestamp}`}
+                        videoId={currentVideo.videoId}
+                        currentTime={currentVideo.timestamp}
+                        onTimeUpdate={() => {}}
+                        className="w-full"
+                      />
+                      <div className="mt-2">
+                        <p className="text-sm font-medium line-clamp-1">
+                          {referencedVideos.find(v => v.videoId === currentVideo.videoId)?.title}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Referenced Videos List */}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <ReferencedVideosList 
+                      videos={referencedVideos}
+                      currentVideo={currentVideo}
+                      onVideoSelect={(videoId, timestamp) => setCurrentVideo({ videoId, timestamp })}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Chat Interface */}
+          <div className="w-full lg:w-1/2 flex flex-col min-h-0 flex-1">
+            <div className="flex-1 min-h-0 lg:h-full">
+              <ChatInterface
+                channelId={channel.id}
+                className="h-full"
+                onMessagesUpdate={handleMessagesUpdate}
+                onCitationClick={(timestamp) => {
+                  console.log('Citation clicked:', timestamp);
+                  // Extract video info from the current context
+                  // This will be called when a citation is clicked in the chat
+                  if (referencedVideos.length > 0) {
+                    // Find the video that contains this timestamp
+                    for (const video of referencedVideos) {
+                      const hasTimestamp = video.citations.some(c => {
+                        // Check if the citation matches exactly or is part of a range
+                        const citationStart = c.timestamp.split(' - ')[0];
+                        return c.timestamp === timestamp || citationStart === timestamp;
+                      });
+                      
+                      if (hasTimestamp) {
+                        // Parse timestamp to seconds
+                        const timestampToParse = timestamp.includes(' - ') ? timestamp.split(' - ')[0] : timestamp;
+                        const parts = timestampToParse.split(':').map(Number);
+                        let seconds = 0;
+                        if (parts.length === 2) {
+                          seconds = parts[0] * 60 + parts[1];
+                        } else if (parts.length === 3) {
+                          seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                        }
+                        
+                        console.log('Setting current video:', video.videoId, 'at', seconds, 'seconds');
+                        setCurrentVideo({ videoId: video.videoId, timestamp: seconds });
+                        break;
+                      }
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -116,6 +116,21 @@ export async function hybridChunkSearch(
   
   // 6. Sort by score and return top K
   const sortedResults = Array.from(allResults.values())
+    // Filter out chunks that start too early unless they're VERY relevant
+    .filter(result => {
+      // If chunk starts in first 5 seconds, only keep if score is exceptional
+      if (result.start_time < 5) {
+        return (result.score || 0) > 0.9;
+      }
+      return true;
+    })
+    .map(result => {
+      // Still penalize early chunks that made it through the filter
+      if (result.start_time < 30) {
+        result.score = (result.score || 0) * 0.7; // 30% penalty for first 30 seconds
+      }
+      return result;
+    })
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, topK);
   

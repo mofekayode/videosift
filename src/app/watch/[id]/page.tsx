@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useBanner } from '@/contexts/BannerContext';
 import { useParams, useSearchParams } from 'next/navigation';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
@@ -28,6 +28,8 @@ export default function WatchPage() {
   const searchParams = useSearchParams();
   const videoId = params.id as string;
   const initialQuestion = searchParams.get('q');
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  const loadVideoCalledRef = useRef(false);
   
   // Debug logging
   useEffect(() => {
@@ -53,7 +55,8 @@ export default function WatchPage() {
   ]);
 
   useEffect(() => {
-    if (videoId) {
+    if (videoId && !loadVideoCalledRef.current) {
+      loadVideoCalledRef.current = true;
       loadVideo();
     }
   }, [videoId]);
@@ -65,7 +68,14 @@ export default function WatchPage() {
   };
 
   const loadVideo = async () => {
+    // Prevent duplicate calls
+    if (isLoadingVideo) {
+      console.log('Already loading video, skipping duplicate call');
+      return;
+    }
+    
     try {
+      setIsLoadingVideo(true);
       setIsProcessing(true);
       setError(null);
       
@@ -91,8 +101,7 @@ export default function WatchPage() {
       setVideoData(data.video);
       updateProcessingStep(0, 'completed');
 
-      // Step 2: Check and process transcript
-      // Always check/process transcript to ensure vector store exists
+      // Step 2: Process transcript
       updateProcessingStep(1, 'active');
       setProcessingStep('Processing transcript...');
       
@@ -104,14 +113,20 @@ export default function WatchPage() {
 
       if (!transcriptResponse.ok) {
         const errorData = await transcriptResponse.json().catch(() => ({}));
-        updateProcessingStep(1, 'error');
-        throw new Error(errorData.error || 'Failed to process transcript');
+        // Only treat 409 (already processing) as non-error
+        if (transcriptResponse.status === 409) {
+          console.log('Video already being processed, continuing...');
+          updateProcessingStep(1, 'completed');
+        } else {
+          updateProcessingStep(1, 'error');
+          throw new Error(errorData.error || 'Failed to process transcript');
+        }
+      } else {
+        const transcriptData = await transcriptResponse.json();
+        console.log('Transcript response:', transcriptData);
+        updateProcessingStep(1, 'completed');
       }
 
-      const transcriptData = await transcriptResponse.json();
-      console.log('Transcript response:', transcriptData);
-      
-      updateProcessingStep(1, 'completed');
       
       // Step 3: Process content
       updateProcessingStep(2, 'active');
@@ -131,6 +146,7 @@ export default function WatchPage() {
     } finally {
       setIsProcessing(false);
       setProcessingStep('');
+      setIsLoadingVideo(false);
     }
   };
 

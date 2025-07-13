@@ -1,0 +1,402 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { ensureUserExists } from '@/lib/user-sync';
+import { OpenAI } from 'openai';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { hybridChunkSearch } from '@/lib/rag-search';
+import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
+import { createChatSession, saveChatMessage, getChatMessageCount } from '@/lib/database';
+import { trackApiError } from '@/lib/error-tracking';
+import { logger, LogCategory, logApiRequest } from '@/lib/logger';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+// Chat session limits
+const CHAT_LIMITS = {
+  ANONYMOUS_USER: 10,
+  SIGNED_USER: 50,
+  FREE_TIER: 50,
+  PREMIUM_TIER: 200
+};
+
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  let httpStatus = 200;
+  let userId: string | null = null;
+  const clientIP = getClientIP(request);
+  
+  try {
+    logger.info(LogCategory.API, 'Channel chat stream request started', {
+      apiEndpoint: '/api/chat-channel-stream',
+      ipAddress: clientIP
+    });
+    
+    const { channelId, message, sessionId, anonId } = await request.json();
+    
+    console.log('📨 Channel chat request:', { channelId, message: message?.substring(0, 50), sessionId, anonId });
+    
+    if (!channelId || !message) {
+      httpStatus = 400;
+      return NextResponse.json(
+        { error: 'Channel ID and message are required' },
+        { status: 400 }
+      );
+    }
+    
+    // Get user authentication
+    const authResult = await auth();
+    userId = authResult.userId;
+    
+    // Get the Supabase user if authenticated
+    let supabaseUserId = null;
+    if (userId) {
+      const user = await ensureUserExists();
+      if (user) {
+        supabaseUserId = user.id;
+      }
+    }
+    
+    // Rate limiting check
+    const identifier = supabaseUserId || clientIP;
+    const tier = getUserTier(userId ?? undefined);
+    
+    let hourlyLimit, dailyLimit;
+    try {
+      [hourlyLimit, dailyLimit] = await Promise.all([
+        checkRateLimit(identifier, 'chat', tier, 'hour'),
+        checkRateLimit(identifier, 'chat', tier, 'day')
+      ]);
+    } catch (rateLimitError) {
+      console.error('Rate limit check failed:', rateLimitError);
+      hourlyLimit = { allowed: true, limit: 30, remaining: 29, resetTime: new Date(Date.now() + 3600000) };
+      dailyLimit = { allowed: true, limit: 30, remaining: 29, resetTime: new Date(Date.now() + 86400000) };
+    }
+    
+    if (!hourlyLimit.allowed || !dailyLimit.allowed) {
+      httpStatus = 429;
+      const limit = !hourlyLimit.allowed ? hourlyLimit : dailyLimit;
+      return NextResponse.json({
+        error: `Rate limit exceeded. You can send ${limit.limit} messages per ${!hourlyLimit.allowed ? 'hour' : 'day'}.`,
+        rateLimited: true,
+        limit: limit.limit,
+        remaining: limit.remaining,
+        resetTime: limit.resetTime,
+        retryAfter: limit.retryAfter
+      }, { status: 429 });
+    }
+    
+    // Get channel info
+    const { data: channel, error: channelError } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('id', channelId)
+      .single();
+    
+    if (channelError || !channel) {
+      return NextResponse.json(
+        { error: 'Channel not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Check if channel is processed
+    if (channel.status !== 'ready') {
+      return NextResponse.json(
+        { error: 'Channel is still being processed. Please wait for processing to complete.' },
+        { status: 503 }
+      );
+    }
+    
+    // Handle chat session
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      try {
+        const session = await createChatSession(
+          supabaseUserId || undefined, 
+          anonId, 
+          channelId,  // Pass channel ID instead of video IDs
+          undefined   // No specific video IDs for channel chat
+        );
+        if (session) {
+          currentSessionId = session.id;
+        } else {
+          currentSessionId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        }
+      } catch (error) {
+        currentSessionId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      }
+    }
+    
+    // Check session limits
+    if (!currentSessionId.startsWith('temp_')) {
+      try {
+        const messageCount = await getChatMessageCount(currentSessionId);
+        const limit = userId ? CHAT_LIMITS.SIGNED_USER : CHAT_LIMITS.ANONYMOUS_USER;
+        
+        if (messageCount >= limit) {
+          return NextResponse.json({
+            success: false,
+            error: userId 
+              ? `You've reached the limit of ${limit} messages per session. Please start a new chat.`
+              : `You've reached the limit of ${limit} messages per session. Sign in for higher limits.`,
+            limitReached: true,
+            messageCount,
+            limit
+          }, { status: 429 });
+        }
+      } catch (error) {
+        console.log('Failed to check session limits:', error);
+      }
+    }
+    
+    // Get all videos from this channel
+    // Note: videos.channel_id references channels.id, not youtube_channel_id
+    const { data: channelVideos, error: videosError } = await supabaseAdmin
+      .from('videos')
+      .select('id, title, youtube_id')
+      .eq('channel_id', channelId)
+      .eq('chunks_processed', true);
+    
+    if (videosError || !channelVideos || channelVideos.length === 0) {
+      return NextResponse.json(
+        { error: 'No processed videos found for this channel' },
+        { status: 404 }
+      );
+    }
+    
+    console.log(`📺 Found ${channelVideos.length} processed videos for channel`);
+    
+    // Search across all videos in the channel in parallel
+    const chunksPerVideo = Math.max(2, Math.floor(10 / channelVideos.length)); // Distribute chunks across videos
+    
+    // Search all videos in parallel for better performance
+    const searchPromises = channelVideos.map(async (video) => {
+      try {
+        const chunks = await hybridChunkSearch(video.id, message, chunksPerVideo);
+        
+        // Add video context to each chunk
+        return chunks.map(chunk => ({
+          ...chunk,
+          video_title: video.title,
+          video_youtube_id: video.youtube_id
+        }));
+      } catch (error) {
+        console.error(`Error searching video ${video.id}:`, error);
+        return [];
+      }
+    });
+    
+    // Wait for all searches to complete
+    const searchResults = await Promise.all(searchPromises);
+    const allRelevantChunks = searchResults.flat();
+    
+    // Sort all chunks by relevance and take top 6 for faster response
+    allRelevantChunks.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
+    const topChunks = allRelevantChunks.slice(0, 6);
+    
+    console.log(`📦 Retrieved ${topChunks.length} relevant chunks across ${channelVideos.length} videos`);
+    
+    if (topChunks.length === 0) {
+      return NextResponse.json(
+        { error: 'No relevant content found in this channel' },
+        { status: 404 }
+      );
+    }
+    
+    // Build context from chunks, grouped by video
+    // Also create a mapping of timestamps to videos
+    const timestampToVideo: Record<string, { videoId: string; title: string }> = {};
+    
+    const videoGroups = topChunks.reduce((acc, chunk) => {
+      const videoKey = chunk.video_youtube_id;
+      if (!acc[videoKey]) {
+        acc[videoKey] = {
+          title: chunk.video_title,
+          chunks: []
+        };
+      }
+      acc[videoKey].chunks.push(chunk.text);
+      
+      // Extract timestamps from this chunk and map them to the video
+      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
+      let match;
+      while ((match = timestampRegex.exec(chunk.text)) !== null) {
+        const timestamp = match[1];
+        timestampToVideo[timestamp] = {
+          videoId: chunk.video_youtube_id,
+          title: chunk.video_title
+        };
+      }
+      
+      return acc;
+    }, {} as Record<string, { title: string; chunks: string[] }>);
+    
+    // Format context with video titles
+    const context = Object.entries(videoGroups)
+      .map(([youtubeId, { title, chunks }]) => {
+        return `**Video: ${title}**\n\n${chunks.join('\n\n')}`;
+      })
+      .join('\n\n---\n\n');
+    
+    // Create chat completion
+    // Create a mapping of video titles to YouTube IDs for citation formatting
+    const videoIdMap = Object.entries(videoGroups).reduce((acc, [youtubeId, { title }]) => {
+      acc[title] = youtubeId;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const systemPrompt = `You are a helpful AI assistant that answers questions about YouTube channel content based on transcripts from multiple videos. 
+
+CRITICAL RULES FOR CITATIONS:
+1. ALWAYS use timestamps when citing content: [MM:SS] or [M:SS]
+2. Use the EXACT timestamps from the transcript chunks you're referencing
+3. Mention which video the information comes from
+4. Never make up or guess timestamps
+5. DO NOT use generic ranges like [0:00 - 3:27] - be SPECIFIC
+6. Only cite the actual moment where the information appears
+7. NEVER cite the beginning of a video (0:00-0:30) unless you're quoting something specific from those seconds
+8. If you can't find a specific timestamp for a claim, don't make the claim
+
+When answering:
+- Be concise and direct
+- Cite specific timestamps from the transcripts
+- Mention the video title when switching between videos
+- Focus on answering the user's question
+
+GOOD citation examples:
+- "The speaker mentions at [2:45] that..."
+- "In the video about X, they explain [1:23:45] how..."
+
+BAD citation examples (NEVER DO THIS):
+- "[0:00 - 3:27]" (too broad, starts at beginning)
+- "[0:00]" (lazy, just the start)
+- "[0:00 - 0:16]" (generic beginning reference)
+
+Available videos in this channel:
+${Object.entries(videoGroups).map(([id, { title }]) => `- ${title}`).join('\n')}
+
+Here is the transcript content from the channel:
+
+${context}`;
+    
+    const stream = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `${message}\n\nPlease cite specific videos and timestamps when answering.` }
+      ],
+      stream: true,
+      temperature: 0.3,
+      max_tokens: 800, // Reduced for faster responses
+    });
+    
+    // Increment rate limit
+    try {
+      await Promise.all([
+        incrementRateLimit(identifier, 'chat', 'hour'),
+        incrementRateLimit(identifier, 'chat', 'day')
+      ]);
+    } catch (error) {
+      console.error('Failed to increment rate limit:', error);
+    }
+    
+    // Save initial user message
+    if (!currentSessionId.startsWith('temp_')) {
+      try {
+        await saveChatMessage(currentSessionId, 'user', message);
+      } catch (error) {
+        console.error('Failed to save user message:', error);
+      }
+    }
+    
+    // Create a TransformStream to collect the response
+    let fullResponse = '';
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    
+    const transformStream = new TransformStream({
+      async transform(chunk, controller) {
+        controller.enqueue(chunk);
+        const text = decoder.decode(chunk, { stream: true });
+        fullResponse += text;
+      },
+      
+      async flush() {
+        // Save the complete response
+        if (!currentSessionId.startsWith('temp_')) {
+          try {
+            await saveChatMessage(currentSessionId, 'assistant', fullResponse);
+          } catch (error) {
+            console.error('Failed to save assistant message:', error);
+          }
+        }
+      }
+    });
+    
+    // Convert OpenAI stream to web stream
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        for await (const part of stream) {
+          const text = part.choices[0]?.delta?.content || '';
+          if (text) {
+            controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
+      },
+    });
+    
+    // Pipe through transform stream
+    const responseStream = readableStream.pipeThrough(transformStream);
+    
+    // Get updated rate limit info
+    let updatedHourlyLimit, updatedDailyLimit;
+    try {
+      [updatedHourlyLimit, updatedDailyLimit] = await Promise.all([
+        checkRateLimit(identifier, 'chat', tier, 'hour'),
+        checkRateLimit(identifier, 'chat', tier, 'day')
+      ]);
+    } catch (error) {
+      updatedHourlyLimit = hourlyLimit;
+      updatedDailyLimit = dailyLimit;
+    }
+    
+    return new Response(responseStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Session-ID': currentSessionId,
+        'X-Channel-Title': channel.title,
+        'X-RateLimit-Limit-Hourly': updatedHourlyLimit.limit.toString(),
+        'X-RateLimit-Remaining-Hourly': updatedHourlyLimit.remaining.toString(),
+        'X-RateLimit-Reset-Hourly': Math.floor(updatedHourlyLimit.resetTime.getTime() / 1000).toString(),
+        'X-RateLimit-Limit-Daily': updatedDailyLimit.limit.toString(),
+        'X-RateLimit-Remaining-Daily': updatedDailyLimit.remaining.toString(),
+        'X-RateLimit-Reset-Daily': Math.floor(updatedDailyLimit.resetTime.getTime() / 1000).toString(),
+        'X-Video-Mapping': JSON.stringify(timestampToVideo)
+      },
+    });
+    
+  } catch (error) {
+    httpStatus = 500;
+    console.error('Channel chat stream error:', error);
+    
+    trackApiError('Channel chat stream API error', {
+      userId: userId || undefined,
+      apiEndpoint: '/api/chat-channel-stream',
+      ipAddress: clientIP,
+      additionalData: { error: error instanceof Error ? error.message : 'Unknown error' }
+    });
+    
+    return NextResponse.json(
+      { error: 'Failed to process chat request' },
+      { status: 500 }
+    );
+  } finally {
+    logApiRequest('POST', '/api/chat-channel-stream', httpStatus, Date.now() - startTime, {
+      userId: userId || undefined,
+      ipAddress: clientIP
+    });
+  }
+}
