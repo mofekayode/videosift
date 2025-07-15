@@ -1,6 +1,12 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend with error handling
+const resendApiKey = process.env.RESEND_API_KEY;
+if (!resendApiKey) {
+  console.warn('⚠️ RESEND_API_KEY is not set in environment variables');
+}
+
+const resend = new Resend(resendApiKey || 'dummy-key-for-build');
 
 export interface ChannelProcessingEmailData {
   userEmail: string;
@@ -20,6 +26,12 @@ export async function sendChannelProcessingNotification(data: ChannelProcessingE
   try {
     console.log(`📧 Sending email notification to ${data.userEmail} for channel: ${data.channelTitle}`);
 
+    // Check if API key exists
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY is not configured');
+      return { success: false, error: 'Email service not configured' };
+    }
+
     const subject = data.status === 'completed' 
       ? `✅ Channel "${data.channelTitle}" is ready for chat!`
       : `❌ Channel "${data.channelTitle}" processing failed`;
@@ -28,18 +40,42 @@ export async function sendChannelProcessingNotification(data: ChannelProcessingE
       ? getSuccessEmailContent(data)
       : getFailureEmailContent(data);
 
+    console.log('📧 Attempting to send email with Resend...');
     const result = await resend.emails.send({
-      from: 'MindSift <onboarding@resend.dev>',
+      from: 'VidSift <onboarding@resend.dev>',
       to: data.userEmail,
       subject,
       html: emailContent
     });
 
-    console.log('✅ Email sent successfully:', result.data?.id);
-    return { success: true, id: result.data?.id };
+    // Log the full result for debugging
+    console.log('📧 Email API Response:', {
+      hasData: !!result.data,
+      hasError: !!result.error,
+      data: result.data,
+      error: result.error
+    });
+    
+    // Check if there was an error
+    if (result.error) {
+      console.error('❌ Resend API error:', result.error);
+      return { success: false, error: result.error.message || 'Email send failed' };
+    }
+    
+    // The correct way to access Resend response
+    const emailId = result.data?.id || 'sent';
+    console.log('✅ Email sent successfully with ID:', emailId);
+    
+    return { success: true, id: emailId };
 
   } catch (error) {
-    console.error('❌ Failed to send email:', error);
+    console.error('❌ Failed to send email - Exception:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
@@ -52,7 +88,7 @@ function getSuccessEmailContent(data: ChannelProcessingEmailData): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Channel Ready - MindSift</title>
+      <title>Channel Ready - VidSift</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
         .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -118,18 +154,18 @@ function getSuccessEmailContent(data: ChannelProcessingEmailData): string {
           <p style="font-size: 16px; line-height: 1.6;">You can now chat with your YouTube channel! Ask questions, get summaries, or explore topics across all ${data.videosProcessed} indexed videos.</p>
           
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://mindsift.ai'}/dashboard?tab=channels" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}/dashboard?tab=channels" class="button">
               Start Chatting with Your Channel
             </a>
           </div>
           
           <p style="color: #64748b; font-size: 14px; margin-top: 24px; line-height: 1.6;">
-            <strong>What's next?</strong> Head to MindSift, select your indexed channel, and start asking questions about your video content. Our AI will search across all ${data.videosProcessed} indexed videos to give you comprehensive answers with precise timestamps.
+            <strong>What's next?</strong> Head to VidSift, select your indexed channel, and start asking questions about your video content. Our AI will search across all ${data.videosProcessed} indexed videos to give you comprehensive answers with precise timestamps.
           </p>
         </div>
         
         <div class="footer">
-          <p style="margin: 0 0 8px 0;">Thanks for using MindSift!</p>
+          <p style="margin: 0 0 8px 0;">Thanks for using VidSift!</p>
           <p style="margin: 0;">If you have any questions, just reply to this email.</p>
         </div>
       </div>
@@ -145,7 +181,7 @@ function getFailureEmailContent(data: ChannelProcessingEmailData): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Channel Processing Failed - MindSift</title>
+      <title>Channel Processing Failed - VidSift</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
         .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -182,10 +218,10 @@ function getFailureEmailContent(data: ChannelProcessingEmailData): string {
             <li>You'll receive another email once it's resolved</li>
           </ul>
           
-          <p>In the meantime, you can still use MindSift with individual video URLs. Just paste any YouTube video link and start chatting!</p>
+          <p>In the meantime, you can still use VidSift with individual video URLs. Just paste any YouTube video link and start chatting!</p>
           
           <div style="text-align: center;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://mindsift.ai'}" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}" class="button">
               Try with Individual Videos
             </a>
           </div>
@@ -206,9 +242,9 @@ export async function sendWelcomeEmail(userEmail: string, userName: string) {
     console.log(`📧 Sending welcome email to ${userEmail}`);
 
     const result = await resend.emails.send({
-      from: 'MindSift <onboarding@resend.dev>',
+      from: 'VidSift <onboarding@resend.dev>',
       to: userEmail,
-      subject: '🎉 Welcome to MindSift - Your AI YouTube Assistant!',
+      subject: '🎉 Welcome to VidSift - Your AI YouTube Assistant!',
       html: getWelcomeEmailContent(userName)
     });
 
@@ -228,7 +264,7 @@ function getWelcomeEmailContent(userName: string): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Welcome to MindSift</title>
+      <title>Welcome to VidSift</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
         .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 20px; }
@@ -242,14 +278,14 @@ function getWelcomeEmailContent(userName: string): string {
     <body>
       <div class="container">
         <div class="header">
-          <h1 style="margin: 0; font-size: 28px;">Welcome to MindSift!</h1>
+          <h1 style="margin: 0; font-size: 28px;">Welcome to VidSift!</h1>
           <p style="margin: 12px 0 0 0; opacity: 0.9; font-size: 18px;">Your AI-powered YouTube assistant</p>
         </div>
         
         <div class="content">
           <p>Hi ${userName || 'there'},</p>
           
-          <p>Thanks for joining MindSift! You now have access to the most powerful way to interact with YouTube content using AI.</p>
+          <p>Thanks for joining VidSift! You now have access to the most powerful way to interact with YouTube content using AI.</p>
           
           <h3 style="color: #1e293b; margin: 24px 0 16px 0;">What you can do:</h3>
           
@@ -269,7 +305,7 @@ function getWelcomeEmailContent(userName: string): string {
           </div>
           
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://mindsift.ai'}" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}" class="button">
               Start Your First Chat
             </a>
           </div>

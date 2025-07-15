@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -82,8 +82,21 @@ interface RoadmapModalProps {
 }
 
 export function RoadmapModal({ trigger }: RoadmapModalProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenRoadmap = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener('open-roadmap-modal', handleOpenRoadmap);
+    return () => {
+      window.removeEventListener('open-roadmap-modal', handleOpenRoadmap);
+    };
+  }, []);
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm" className="gap-2">
@@ -96,7 +109,7 @@ export function RoadmapModal({ trigger }: RoadmapModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <Rocket className="h-6 w-6 text-primary" />
-            MindSift Roadmap
+            VidSift Roadmap
           </DialogTitle>
           <DialogDescription className="text-base">
             Exciting features coming soon to enhance your video analysis experience

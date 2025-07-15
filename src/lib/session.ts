@@ -18,7 +18,7 @@ export async function generateDeviceAnonId(): Promise<string> {
 }
 
 // Storage key for anonymous ID
-const ANON_ID_KEY = 'mindsift_anon_id';
+const ANON_ID_KEY = 'vidsift_anon_id';
 
 // Get or create anonymous ID from localStorage
 export function getOrCreateAnonId(): string {

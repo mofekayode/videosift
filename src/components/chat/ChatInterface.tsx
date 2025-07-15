@@ -363,7 +363,7 @@ export function ChatInterface({
   useEffect(() => {
     if (isSignedIn && user && !migrationAttemptedRef.current) {
       // Check if we have an anonymous ID to migrate from
-      const storedAnonId = localStorage.getItem('mindsift_anon_id');
+      const storedAnonId = localStorage.getItem('vidsift_anon_id');
       
       if (storedAnonId) {
         migrationAttemptedRef.current = true;
@@ -376,7 +376,7 @@ export function ChatInterface({
             if (result.success && result.sessions_migrated && result.sessions_migrated > 0) {
               console.log(`✅ Migrated ${result.sessions_migrated} session(s)`);
               // Clear anonymous ID after successful migration
-              localStorage.removeItem('mindsift_anon_id');
+              localStorage.removeItem('vidsift_anon_id');
               setAnonId(null);
               // Refresh message count after migration
               const response = await fetch('/api/user/message-count');
@@ -855,7 +855,7 @@ export function ChatInterface({
           <div className="max-w-4xl mx-auto px-4 py-6">
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-medium text-primary">MAI</span>
+                <span className="text-xs font-medium text-primary">VAI</span>
               </div>
               <div className="flex-1 max-w-[80%]">
                 <div className="rounded-2xl px-4 py-3 bg-transparent">
@@ -1075,7 +1075,7 @@ function MessageBubbleInternal({ message, onCitationClick, user, channelVideos =
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} gap-3`}>
         {!isUser && (
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-medium text-primary">MAI</span>
+            <span className="text-xs font-medium text-primary">VAI</span>
           </div>
         )}
         <div className={`flex-1 ${isUser ? 'max-w-[80%] ml-auto' : 'max-w-[80%]'}`}>

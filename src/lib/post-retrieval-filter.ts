@@ -81,10 +81,17 @@ export function balanceChunksByVideo(
   // Take top chunks from each video
   const balancedChunks: Array<any> = [];
   
-  // First pass: take up to maxChunksPerVideo from each video
+  // First pass: ensure at least 1 chunk from each video (if available)
   videoGroups.forEach((videoChunks, videoId) => {
-    const topChunks = videoChunks.slice(0, maxChunksPerVideo);
-    balancedChunks.push(...topChunks);
+    if (videoChunks.length > 0) {
+      balancedChunks.push(videoChunks[0]); // Add the most relevant chunk from each video
+    }
+  });
+  
+  // Second pass: add more chunks up to maxChunksPerVideo from each video
+  videoGroups.forEach((videoChunks, videoId) => {
+    const additionalChunks = videoChunks.slice(1, maxChunksPerVideo);
+    balancedChunks.push(...additionalChunks);
   });
   
   // If we're under the limit, add more chunks from the most relevant videos
@@ -103,8 +110,6 @@ export function balanceChunksByVideo(
     balancedChunks.push(...additionalChunks.slice(0, remainingSlots));
   }
   
-  // Final sort by relevance
-  return balancedChunks
-    .sort((a, b) => (b.finalScore || b.similarity || 0) - (a.finalScore || a.similarity || 0))
-    .slice(0, totalLimit);
+  // Final sort by relevance while maintaining some video diversity
+  return balancedChunks.slice(0, totalLimit);
 }

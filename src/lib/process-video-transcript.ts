@@ -1,8 +1,9 @@
 import { downloadTranscript } from '@/lib/transcript';
 import { getVideoByYouTubeId, updateVideoTranscriptStatus } from '@/lib/database';
 import { processTranscriptWithChunks } from '@/lib/transcript-processor';
+import { DistributedLock } from '@/lib/distributed-lock';
 
-// Simple in-memory lock to prevent concurrent processing
+// Keep in-memory lock as fallback for single instance
 const processingVideos = new Set<string>();
 
 export interface ProcessVideoResult {
@@ -50,16 +51,22 @@ export async function processVideoTranscript(youtubeVideoId: string): Promise<Pr
       };
     }
     
-    // Check if video is currently being processed
-    if (processingVideos.has(youtubeVideoId)) {
-      console.log('⚠️ Video is already being processed by another request');
-      return {
-        success: false,
-        error: 'Video is already being processed'
-      };
+    // Try to acquire distributed lock first (for multi-instance deployments)
+    const lockId = `video_${youtubeVideoId}`;
+    const hasDistributedLock = await DistributedLock.acquire(lockId, 300); // 5 minute TTL
+    
+    if (!hasDistributedLock) {
+      // Fallback to in-memory check for single instance
+      if (processingVideos.has(youtubeVideoId)) {
+        console.log('⚠️ Video is already being processed by another request');
+        return {
+          success: false,
+          error: 'Video is already being processed'
+        };
+      }
     }
     
-    // Add to processing set
+    // Add to in-memory set as additional protection
     processingVideos.add(youtubeVideoId);
     
     try {
@@ -118,8 +125,11 @@ export async function processVideoTranscript(youtubeVideoId: string): Promise<Pr
         };
       }
     } finally {
-      // Always remove from processing set
+      // Always remove from processing set and release lock
       processingVideos.delete(youtubeVideoId);
+      if (hasDistributedLock) {
+        await DistributedLock.release(lockId);
+      }
     }
     
   } catch (error) {

@@ -30,12 +30,12 @@ export function DynamicHeader() {
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Image
             src="/favicon.svg"
-            alt="MindSift"
+            alt="VidSift"
             width={24}
             height={24}
             className="w-6 h-6"
           />
-          <span className="font-semibold text-sm hidden sm:inline">MindSift</span>
+          <span className="font-semibold text-sm hidden sm:inline">VidSift</span>
         </Link>
 
         {/* User Controls - Right side */}

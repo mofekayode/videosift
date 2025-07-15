@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef, Suspense } from 'react';
-import { useBanner } from '@/contexts/BannerContext';
 import { useParams, useSearchParams } from 'next/navigation';
 import { VideoPlayer, VideoPlayerRef } from '@/components/video/VideoPlayer';
 import { ChatInterface } from '@/components/chat/ChatInterface';
@@ -9,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingCard, ProcessingSteps } from '@/components/ui/loading';
 import { ErrorCard, handleApiError } from '@/components/ui/error';
-import { ArrowLeft, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MessageSquare } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
+import { RecentChatsSheet } from '@/components/chat/RecentChatsSheet';
 
 interface VideoData {
   id: string;
@@ -45,7 +45,6 @@ function WatchPageContent() {
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const [citationTimestamps, setCitationTimestamps] = useState<string[]>([]);
   const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null);
-  const { bannerVisible, setBannerVisible, showBanner } = useBanner();
   const [processingSteps, setProcessingSteps] = useState<{
     label: string;
     status: 'pending' | 'active' | 'completed' | 'error';
@@ -251,32 +250,7 @@ function WatchPageContent() {
 
   return (
     <>
-      {/* Top Banner - Fade in after 2 seconds */}
-      {bannerVisible && (
-        <div className={`fixed top-0 left-0 right-0 w-full bg-background/80 backdrop-blur-sm border-b px-4 py-2 z-[10000] transition-opacity duration-500 ${
-          showBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}>
-          <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex-1" />
-            <p className="text-sm font-semibold text-purple-600" style={{ letterSpacing: '0.25px' }}>
-              Multi-channel search coming soon
-            </p>
-            <div className="flex-1 flex items-center justify-end">
-              <button
-                onClick={() => setBannerVisible(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Close banner"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className={`h-screen flex flex-col transition-all duration-300 ${
-        bannerVisible && showBanner ? 'pt-14' : 'pt-2'
-      }`}>{/* Dynamic padding based on banner visibility */}
+      <div className="h-screen flex flex-col pt-2">
       
       {/* Header */}
       <header className="border-b p-2 sm:p-4 flex items-center ml-8 sm:ml-12">
@@ -305,6 +279,21 @@ function WatchPageContent() {
             Duration: {formatDuration(videoData.duration)}
           </p>
         </div>
+        
+        {/* Recent Chats Button */}
+        {isSignedIn && (
+          <div className="ml-auto mr-2">
+            <RecentChatsSheet 
+              currentVideoId={videoData.youtube_id}
+              trigger={
+                <Button variant="outline" size="sm" className="gap-1 sm:gap-2">
+                  <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline text-xs">Chat history</span>
+                </Button>
+              }
+            />
+          </div>
+        )}
       </header>
 
       {/* Main Content */}

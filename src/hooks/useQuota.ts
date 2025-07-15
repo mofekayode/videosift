@@ -47,7 +47,7 @@ export function useQuota(): QuotaData {
           
           // For anonymous users, get anon ID from localStorage
           if (!user) {
-            const anonId = localStorage.getItem('mindsift_anon_id');
+            const anonId = localStorage.getItem('vidsift_anon_id');
             if (anonId) {
               headers['x-anon-id'] = anonId;
             }

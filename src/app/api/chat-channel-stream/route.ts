@@ -9,6 +9,7 @@ import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/
 import { createChatSession, saveChatMessage, getChatMessageCount, getChatMessagesBySession } from '@/lib/database';
 import { trackApiError } from '@/lib/error-tracking';
 import { logger, LogCategory, logApiRequest } from '@/lib/logger';
+import { logSearchCoverage } from '@/lib/debug-search';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -169,9 +170,12 @@ export async function POST(request: NextRequest) {
     
     console.log(`📺 Found ${channelVideos.length} processed videos for channel`);
     
+    // Detect if this is a general channel query
+    const isGeneralChannelQuery = /tell me about|all videos|what videos|channel content|channel overview|indexed so far/i.test(message);
+    
     // Search across all videos in the channel in parallel
     // Get more chunks per video to ensure we find all relevant content
-    const chunksPerVideo = 10; // Get 10 chunks from each video to better find specific content
+    const chunksPerVideo = isGeneralChannelQuery ? 2 : 10; // Less chunks per video for general queries to cover more videos
     
     // Search all videos in parallel for better performance
     const searchPromises = channelVideos.map(async (video: any) => {
@@ -197,11 +201,31 @@ export async function POST(request: NextRequest) {
     // Apply post-retrieval filtering to better match content
     const filteredChunks = filterChunksByContent(allRelevantChunks, message);
     
-    // Balance chunks across videos to ensure good coverage
-    const topChunks = balanceChunksByVideo(filteredChunks, 5, 30);
+    // Ensure chunks have the required properties for balanceChunksByVideo
+    const typedChunks = filteredChunks.map(chunk => {
+      return {
+        ...chunk,
+        video_youtube_id: chunk.video_youtube_id || '',
+        video_title: chunk.video_title || ''
+      };
+    });
     
-    console.log(`📦 Retrieved ${topChunks.length} relevant chunks across ${channelVideos.length} videos`);
+    // Balance chunks across videos to ensure good coverage
+    // For general queries, prioritize coverage over depth
+    const maxChunksPerVideo = isGeneralChannelQuery ? 2 : 3;
+    const totalChunkLimit = isGeneralChannelQuery ? 60 : 50; // More chunks for general queries
+    const topChunks = balanceChunksByVideo(typedChunks, maxChunksPerVideo, totalChunkLimit);
+    
+    // Debug logging for development
+    if (process.env.NODE_ENV === 'development') {
+      logSearchCoverage(channelVideos as any[], searchResults, topChunks);
+    }
+    
+    // Log video coverage
+    const uniqueVideosInContext = new Set(topChunks.map(c => c.video_youtube_id));
+    console.log(`📦 Retrieved ${topChunks.length} chunks from ${uniqueVideosInContext.size}/${channelVideos.length} videos`);
     console.log(`🎯 Top chunk scores: ${topChunks.slice(0, 3).map(c => (c.finalScore || c.similarity || 0).toFixed(3)).join(', ')}`);
+    console.log(`📹 Videos in context: ${Array.from(uniqueVideosInContext).length} videos`);
     
     if (topChunks.length === 0) {
       return NextResponse.json(
@@ -224,31 +248,50 @@ export async function POST(request: NextRequest) {
       }
       acc[videoKey].chunks.push(chunk.text || '');
       
-      // Extract timestamps from this chunk and map them to the video
-      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
-      let match;
-      while ((match = timestampRegex.exec(chunk.text || '')) !== null) {
-        const timestamp = match[1];
-        timestampToVideo[timestamp] = {
-          videoId: chunk.video_youtube_id,
-          title: chunk.video_title
-        };
-      }
+      // Store the chunk's time range for accurate timestamp mapping
+      const startTime = Math.floor(chunk.start_time);
+      const endTime = Math.floor(chunk.end_time);
+      
+      // Convert seconds to timestamp format
+      const formatTime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+          return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+      };
+      
+      // Map the chunk's actual time range to this video
+      const chunkTimestamp = formatTime(startTime);
+      timestampToVideo[chunkTimestamp] = {
+        videoId: chunk.video_youtube_id,
+        title: chunk.video_title
+      };
       
       return acc;
     }, {} as Record<string, { title: string; chunks: string[] }>);
     
     // Format context with video titles
     const context = Object.entries(videoGroups)
-      .map(([youtubeId, { title, chunks }]) => {
-        return `**Video: ${title}**\n\n${chunks.join('\n\n')}`;
+      .map(([youtubeId, group]) => {
+        const typedGroup = group as { title: string; chunks: string[] };
+        return `**Video: ${typedGroup.title}**
+
+${typedGroup.chunks.join('\n\n')}`;
       })
       .join('\n\n---\n\n');
     
+    // Create a complete list of ALL videos in the channel for context
+    const allVideosList = (channelVideos as Array<{ id: string; title: string; youtube_id: string }>).map(v => `- ${v.title}`).join('\n');
+    
     // Create chat completion
     // Create a mapping of video titles to YouTube IDs for citation formatting
-    const videoIdMap = Object.entries(videoGroups).reduce((acc, [youtubeId, { title }]) => {
-      acc[title] = youtubeId;
+    const videoIdMap = Object.entries(videoGroups).reduce((acc, [youtubeId, group]) => {
+      const typedGroup = group as { title: string; chunks: string[] };
+      acc[typedGroup.title] = youtubeId;
       return acc;
     }, {} as Record<string, string>);
 
@@ -269,6 +312,12 @@ IMPORTANT: When users ask for specific data, statistics, or numbers:
 - If the data is present, cite it with the specific timestamp and video
 - NEVER say information isn't in the videos without thoroughly checking all segments
 - Look for numbers, statistics, and data points throughout all videos
+
+CRITICAL: When users ask about "all videos" or "tell me about the channel":
+- List ALL ${channelVideos.length} videos from the complete list above
+- Provide a brief summary of each video based on available information
+- If you don't have detailed segments for some videos, still acknowledge they exist
+- NEVER claim you only have information about a subset of videos
 
 CRITICAL: When users ask about specific people, topics, or events:
 - Search THOROUGHLY across ALL videos in the channel
@@ -295,8 +344,16 @@ BAD citation examples (NEVER DO THIS):
 - "[0:00]" (lazy citation without context)
 - "The transcript mentions..." (never say transcript!)
 
-Videos in this channel:
-${Object.entries(videoGroups).map(([id, { title }]) => `- ${title}`).join('\n')}
+ALL videos in this channel (${channelVideos.length} total):
+${allVideosList}
+
+IMPORTANT: The above list shows ALL videos in the channel. You have knowledge of all these videos, even if specific segments aren't included below. When users ask about the channel's content, acknowledge all videos exist.
+
+Currently retrieved segments from these videos:
+${Object.entries(videoGroups).map(([id, group]) => {
+  const typedGroup = group as { title: string; chunks: string[] };
+  return `- ${typedGroup.title}`;
+}).join('\n')}
 
 Video content and moments:
 
@@ -323,11 +380,14 @@ ${context}`;
       messages: [
         { role: 'system', content: systemPrompt },
         ...previousMessages,
-        { role: 'user', content: `${message}\n\nPlease reference specific videos and timestamps when answering.` }
+        { role: 'user', content: isGeneralChannelQuery 
+          ? `${message}\n\nIMPORTANT: List ALL ${channelVideos.length} videos in the channel with brief descriptions. Reference specific videos and timestamps when providing details.`
+          : `${message}\n\nPlease reference specific videos and timestamps when answering.` 
+        }
       ],
       stream: true,
       temperature: 0.3,
-      max_tokens: 1000, // Slightly increased to allow for better responses
+      max_tokens: 1500, // Increased to allow listing all videos when requested
     });
     
     // Increment rate limit

@@ -39,11 +39,12 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
           youtube_channel_id,
           title,
           status,
-          users!channels_owner_user_id_fkey (
-            id,
-            email,
-            clerk_id
-          )
+          owner_user_id
+        ),
+        users!channel_queue_requested_by_fkey (
+          id,
+          email,
+          clerk_id
         )
       `)
       .eq('status', 'pending')
@@ -114,11 +115,20 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
           
           console.log(`✅ Completed channel: ${queueItem.channels.title} (${result.videosProcessed} videos)`);
           
-          // Send success email
-          if (queueItem.channels.users?.email) {
+          // Debug user data
+          console.log('📧 User data for email:', {
+            hasUsers: !!queueItem.users,
+            email: queueItem.users?.email,
+            userId: queueItem.users?.id,
+            requestedBy: queueItem.requested_by,
+            channelOwnerId: queueItem.channels.owner_user_id
+          });
+          
+          // Send success email to the user who requested the processing
+          if (queueItem.users?.email) {
             await sendChannelProcessingNotification({
-              userEmail: queueItem.channels.users.email,
-              userName: extractUserNameFromEmail(queueItem.channels.users.email),
+              userEmail: queueItem.users.email,
+              userName: extractUserNameFromEmail(queueItem.users.email),
               channelTitle: queueItem.channels.title,
               channelUrl: `https://youtube.com/channel/${queueItem.channels.youtube_channel_id}`,
               videosProcessed: result.videosProcessed,
@@ -154,11 +164,11 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
           
           console.error(`❌ Failed channel: ${queueItem.channels.title} - ${result.error}`);
           
-          // Send failure email
-          if (queueItem.channels.users?.email) {
+          // Send failure email to the user who requested the processing
+          if (queueItem.users?.email) {
             await sendChannelProcessingNotification({
-              userEmail: queueItem.channels.users.email,
-              userName: extractUserNameFromEmail(queueItem.channels.users.email),
+              userEmail: queueItem.users.email,
+              userName: extractUserNameFromEmail(queueItem.users.email),
               channelTitle: queueItem.channels.title,
               channelUrl: `https://youtube.com/channel/${queueItem.channels.youtube_channel_id}`,
               videosProcessed: 0,
@@ -258,98 +268,111 @@ async function processChannelVideos(channel: any, queueId: string): Promise<{
     let failedCount = 0;
     let noTranscriptCount = 0;
     
-    // Process each video
-    for (let index = 0; index < videos.length; index++) {
-      const video = videos[index];
-      try {
-        console.log(`🎬 Processing video: ${video.snippet.title}`);
-        
-        // Check if video already exists
-        const { data: existingVideo } = await supabaseAdmin
-          .from('videos')
-          .select('id, channel_id, transcript_cached')
-          .eq('youtube_id', video.id.videoId)
-          .single();
-        
-        if (existingVideo) {
-          console.log(`⏭️  Video already exists: ${video.snippet.title}`);
-          
-          // Link video to channel if not already linked
-          if (existingVideo.channel_id !== channel.id) {
-            await supabaseAdmin
+    // Process videos in batches for better performance
+    const BATCH_SIZE = 3; // Process 3 videos concurrently
+    
+    for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+      const batch = videos.slice(i, i + BATCH_SIZE);
+      
+      // Process batch in parallel
+      const batchResults = await Promise.allSettled(
+        batch.map(async (video, batchIndex) => {
+          const index = i + batchIndex;
+          try {
+            console.log(`🎬 Processing video: ${video.snippet.title}`);
+            
+            // Check if video already exists
+            const { data: existingVideo } = await supabaseAdmin
               .from('videos')
-              .update({ channel_id: channel.id })
-              .eq('id', existingVideo.id);
-            console.log(`🔗 Linked existing video to channel`);
+              .select('id, channel_id, transcript_cached')
+              .eq('youtube_id', video.id.videoId)
+              .single();
+            
+            if (existingVideo) {
+              console.log(`⏭️  Video already exists: ${video.snippet.title}`);
+              
+              // Link video to channel if not already linked
+              if (existingVideo.channel_id !== channel.id) {
+                await supabaseAdmin
+                  .from('videos')
+                  .update({ channel_id: channel.id })
+                  .eq('id', existingVideo.id);
+                console.log(`🔗 Linked existing video to channel`);
+              }
+              
+              // Return counts for aggregation
+              return {
+                existed: true,
+                processed: existingVideo.transcript_cached,
+                noTranscript: !existingVideo.transcript_cached
+              };
+            }
+            
+            // Create video record
+            const { data: videoRecord, error: videoError } = await supabaseAdmin
+              .from('videos')
+              .insert([{
+                youtube_id: video.id.videoId,
+                title: video.snippet.title,
+                description: video.snippet.description || '',
+                thumbnail_url: video.snippet.thumbnails?.medium?.url || '',
+                duration: 0,
+                channel_id: channel.id,
+                transcript_cached: false
+              }])
+              .select()
+              .single();
+            
+            if (videoError) {
+              console.error(`❌ Error creating video record:`, videoError);
+              return { failed: true };
+            }
+            
+            // Process transcript directly
+            const transcriptResult = await processVideoTranscript(video.id.videoId);
+            
+            if (transcriptResult.success) {
+              console.log(`✅ Processed transcript: ${transcriptResult.chunkCount} chunks`);
+              return { processed: true };
+            } else {
+              console.error(`❌ Failed to process transcript: ${transcriptResult.error}`);
+              if (transcriptResult.error?.includes('No transcript available') || 
+                  transcriptResult.error?.includes('No captions found')) {
+                return { noTranscript: true };
+              } else {
+                return { failed: true };
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error processing video ${video.snippet.title}:`, error);
+            return { failed: true };
           }
-          
-          existingCount++;
-          
-          // Always count existing videos as processed for consistency
-          // This gives users the expected count (e.g., 20/20 videos)
-          if (existingVideo.transcript_cached) {
-            console.log(`✅ Video already indexed with transcript: ${video.snippet.title}`);
-            processedCount++;
-          } else {
-            console.log(`⚠️ Video exists but no transcript (counting as processed): ${video.snippet.title}`);
-            processedCount++;
-            noTranscriptCount++;
-          }
-          continue;
-        }
-        
-        // Create video record
-        const { data: videoRecord, error: videoError } = await supabaseAdmin
-          .from('videos')
-          .insert([{
-            youtube_id: video.id.videoId,
-            title: video.snippet.title,
-            description: video.snippet.description || '',
-            thumbnail_url: video.snippet.thumbnails?.medium?.url || '',
-            duration: 0,
-            channel_id: channel.id,
-            transcript_cached: false
-          }])
-          .select()
-          .single();
-        
-        if (videoError) {
-          console.error(`❌ Error creating video record:`, videoError);
-          failedCount++;
-          continue;
-        }
-        
-        // Process transcript directly
-        const transcriptResult = await processVideoTranscript(video.id.videoId);
-        
-        if (transcriptResult.success) {
-          console.log(`✅ Processed transcript: ${transcriptResult.chunkCount} chunks`);
-          processedCount++;
+        })
+      );
+      
+      // Aggregate batch results
+      batchResults.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          const value = result.value;
+          if (value.existed) existingCount++;
+          if (value.processed) processedCount++;
+          if (value.noTranscript) noTranscriptCount++;
+          if (value.failed) failedCount++;
         } else {
-          console.error(`❌ Failed to process transcript: ${transcriptResult.error}`);
-          if (transcriptResult.error?.includes('No transcript available') || 
-              transcriptResult.error?.includes('No captions found')) {
-            noTranscriptCount++;
-          } else {
-            failedCount++;
-          }
+          failedCount++;
         }
-        
-        // Update progress
-        await supabaseAdmin
-          .from('channel_queue')
-          .update({ 
-            videos_processed: processedCount,
-            current_video_index: index + 1,
-            current_video_title: video.snippet.title,
-            estimated_completion_at: new Date(Date.now() + ((videos.length - processedCount) * 15000)).toISOString()
-          })
-          .eq('id', queueId);
-        
-      } catch (error) {
-        console.error(`❌ Error processing video ${video.snippet.title}:`, error);
-        failedCount++;
-      }
+      });
+      
+      // Update progress after each batch
+      await supabaseAdmin
+        .from('channel_queue')
+        .update({ 
+          videos_processed: processedCount,
+          current_video_index: Math.min(i + BATCH_SIZE, videos.length),
+          current_video_title: batch[batch.length - 1]?.snippet.title || '',
+          estimated_completion_at: new Date(Date.now() + ((videos.length - processedCount) * 5000)).toISOString()
+        })
+        .eq('id', queueId);
     }
     
     console.log(`✅ Completed: ${processedCount} videos processed out of ${videos.length}`);

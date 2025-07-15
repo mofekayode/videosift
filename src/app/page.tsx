@@ -19,6 +19,7 @@ import { SignInButton, useUser } from '@clerk/nextjs';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { Footer } from '@/components/layout/Footer';
 
 export default function Home() {
   const router = useRouter();
@@ -326,7 +327,7 @@ export default function Home() {
       <div className="w-full max-w-2xl space-y-6 sm:space-y-8">
         <div className="text-center space-y-2 sm:space-y-4">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            MindSift
+            VidSift
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground">
             Chat with any YouTube video using AI
@@ -615,7 +616,7 @@ export default function Home() {
                         variant="secondary" 
                         size="sm" 
                         className="text-sm"
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push('/dashboard?tab=channels')}
                       >
                         Manage Channels & History
                       </Button>
@@ -642,6 +643,7 @@ export default function Home() {
         </Card>
       </div>
       </div>
+      <Footer />
     </>
   );
 }

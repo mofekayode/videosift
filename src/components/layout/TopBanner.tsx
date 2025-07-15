@@ -16,10 +16,10 @@ export function TopBanner() {
       <div className="relative max-w-6xl mx-auto">
         <div className="flex items-center justify-center">
           <p className="text-sm text-muted-foreground text-center">
-            <span className="font-semibold">Welcome to MindSift!</span> This is a beta release. 
+            <span className="font-semibold">Welcome to VidSift!</span> This is a beta release. 
             You can report bugs or request features{' '}
             <a 
-              href="mailto:mofekayode@gmail.com?subject=MindSift%20Feedback" 
+              href="mailto:mofekayode@gmail.com?subject=VidSift%20Feedback" 
               className="underline hover:text-foreground transition-colors"
             >
               here
