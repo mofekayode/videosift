@@ -29,49 +29,36 @@ export async function DELETE(
 
     const channelId = id;
 
-    // Verify the channel belongs to the user
-    const { data: channel, error: fetchError } = await supabase
-      .from('channels')
-      .select('id, owner_user_id')
-      .eq('id', channelId)
-      .eq('owner_user_id', user.id)
+    // Verify the user has access to this channel via queue
+    const { data: queueEntry, error: fetchError } = await supabase
+      .from('channel_queue')
+      .select('*')
+      .eq('channel_id', channelId)
+      .eq('requested_by', user.id)
       .single();
 
-    if (fetchError || !channel) {
+    if (fetchError || !queueEntry) {
       return NextResponse.json(
         { error: 'Channel not found or access denied' },
         { status: 404 }
       );
     }
 
-    // Soft delete by setting owner_user_id to null
-    // This makes the channel inaccessible to the user but preserves the data
-    const { error: updateError } = await supabase
-      .from('channels')
-      .update({ 
-        owner_user_id: null,
-        // Add a deleted_by field if you want to track who deleted it
-        metadata: {
-          deleted_by: userId,
-          deleted_at: new Date().toISOString()
-        }
-      })
-      .eq('id', channelId);
-
-    if (updateError) {
-      console.error('Error soft-deleting channel:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to delete channel' },
-        { status: 500 }
-      );
-    }
-
-    // Also remove from channel_queue if exists
-    await supabase
+    // Remove user's access to the channel by deleting their queue entry
+    // This preserves the channel and videos for other users who may have indexed it
+    const { error: deleteError } = await supabase
       .from('channel_queue')
       .delete()
       .eq('channel_id', channelId)
-      .eq('user_id', user.id);
+      .eq('requested_by', user.id);
+
+    if (deleteError) {
+      console.error('Error removing channel access:', deleteError);
+      return NextResponse.json(
+        { error: 'Failed to remove channel access' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

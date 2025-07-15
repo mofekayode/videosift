@@ -292,7 +292,7 @@ export default function ChannelChatPage() {
             <h1 className="font-semibold text-sm sm:text-lg line-clamp-1">{channel.title}</h1>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Chat with {channel.video_count} videos • Ask about any topic across all videos
+            Chat with {channel.video_count} indexed videos • Ask about any topic across the channel
           </p>
         </div>
       </header>
@@ -309,7 +309,7 @@ export default function ChannelChatPage() {
                   <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-semibold mb-2">Channel Chat</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Ask questions about any topic across all {channel.video_count} videos in this channel.
+                    Ask questions about any topic across the {channel.video_count} indexed videos in this channel.
                   </p>
                   <p className="text-xs text-muted-foreground">
                     When videos are referenced in responses, they&apos;ll appear here.

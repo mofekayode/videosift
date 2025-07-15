@@ -9,73 +9,104 @@ export async function GET(request: NextRequest) {
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Get the Supabase user
-    const user = await ensureUserExists();
-    if (!user) {
+    const { searchParams } = new URL(request.url);
+    const channelId = searchParams.get('channelId');
+    
+    if (!channelId) {
       return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
+        { error: 'Channel ID required' },
+        { status: 400 }
       );
     }
 
-    // Get all user's channels with queue status
-    const { data: channels, error } = await supabase
-      .from('channels')
-      .select(`
-        *,
-        channel_queue (
-          id,
-          status,
-          started_at,
-          completed_at,
-          error_message,
-          videos_processed,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq('owner_user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching channel status:', error);
+    // Ensure user exists in Supabase
+    const user = await ensureUserExists();
+    if (!user) {
       return NextResponse.json(
-        { error: 'Failed to fetch channel status' },
+        { error: 'Failed to sync user data' },
         { status: 500 }
       );
     }
 
-    // Get video counts for each channel
-    const channelsWithDetails = await Promise.all(
-      (channels || []).map(async (channel) => {
-        const { count: videoCount } = await supabase
-          .from('videos')
-          .select('*', { count: 'exact', head: true })
-          .eq('channel_id', channel.id)
-          .eq('chunks_processed', true);
+    // Get channel details with video count and queue status
+    const { data: channel, error: channelError } = await supabase
+      .from('channels')
+      .select(`
+        *,
+        channel_queue!channel_queue_channel_id_fkey (
+          id,
+          status,
+          videos_processed,
+          total_videos,
+          current_video_index,
+          current_video_title,
+          error_message,
+          started_at,
+          completed_at
+        )
+      `)
+      .eq('id', channelId)
+      .single();
+    
+    if (channelError || !channel) {
+      return NextResponse.json(
+        { error: 'Channel not found' },
+        { status: 404 }
+      );
+    }
 
-        return {
-          ...channel,
-          processed_video_count: videoCount || 0,
-          queue_status: channel.channel_queue?.[0] || null
-        };
-      })
-    );
+    // Count actual videos in the channel
+    const { count: actualVideoCount } = await supabase
+      .from('videos')
+      .select('*', { count: 'exact', head: true })
+      .eq('channel_id', channelId);
+
+    // Count videos with transcripts
+    const { count: videosWithTranscripts } = await supabase
+      .from('videos')
+      .select('*', { count: 'exact', head: true })
+      .eq('channel_id', channelId)
+      .eq('transcript_cached', true);
+
+    // Get recent processing logs
+    const { data: processingHistory } = await supabase
+      .from('channel_queue')
+      .select('*')
+      .eq('channel_id', channelId)
+      .order('requested_at', { ascending: false })
+      .limit(5);
 
     return NextResponse.json({
       success: true,
-      channels: channelsWithDetails
+      channel: {
+        ...channel,
+        actualVideoCount,
+        videosWithTranscripts,
+        processingHistory,
+        transparency: {
+          expectedVideos: channel.total_video_count || 20,
+          actualVideosInDB: actualVideoCount || 0,
+          videosWithTranscripts: videosWithTranscripts || 0,
+          displayedCount: channel.video_count || 0,
+          status: channel.status,
+          lastProcessingAttempt: processingHistory?.[0] || null
+        }
+      }
     });
 
   } catch (error) {
-    console.error('Error in channel status:', error);
+    console.error('❌ Error fetching channel status:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Failed to fetch channel status',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

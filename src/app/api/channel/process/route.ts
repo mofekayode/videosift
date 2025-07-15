@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import { createChannel, queueChannel, getUserByClerkId } from '@/lib/database';
 import { extractChannelId } from '@/lib/youtube';
 import { ensureUserExists } from '@/lib/user-sync';
+import { checkRateLimit, getUserTier } from '@/lib/rate-limit';
+import { supabase } from '@/lib/supabase';
 
 // Import the processing function
 import { processChannelQueue } from '@/lib/channel-processor';
@@ -39,6 +41,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to sync user data' },
         { status: 500 }
+      );
+    }
+
+    // Check channel quota
+    const tier = getUserTier(userId);
+    const channelLimit = tier === 'premium' ? 10 : 1; // 1 for beta users, 10 for premium
+    
+    // Count existing channels
+    const { count: existingChannels, error: countError } = await supabase
+      .from('channels')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_user_id', user.id);
+    
+    if (countError) {
+      console.error('Error counting channels:', countError);
+      return NextResponse.json(
+        { error: 'Failed to check channel quota' },
+        { status: 500 }
+      );
+    }
+    
+    if ((existingChannels || 0) >= channelLimit) {
+      return NextResponse.json(
+        { 
+          error: `You've reached your channel limit (${channelLimit}). ${tier === 'free' ? 'Premium users can index up to 10 channels.' : 'Contact support to increase your limit.'}`,
+          quotaExceeded: true,
+          limit: channelLimit,
+          used: existingChannels || 0
+        },
+        { status: 429 }
       );
     }
 
@@ -129,9 +161,36 @@ export async function POST(request: NextRequest) {
 
     if (!channel) {
       return NextResponse.json(
-        { error: 'Failed to create channel record' },
+        { error: 'Failed to create or retrieve channel record' },
         { status: 500 }
       );
+    }
+
+    // Check if channel is already processed
+    if (channel.status === 'ready') {
+      // Channel is already processed, just create queue entry for this user
+      const queueItem = await queueChannel(channel.id, user.id);
+      
+      if (!queueItem) {
+        return NextResponse.json(
+          { error: 'Failed to add channel access' },
+          { status: 500 }
+        );
+      }
+
+      console.log('✅ Channel already processed, added user access:', channel.title);
+
+      return NextResponse.json({
+        success: true,
+        alreadyProcessed: true,
+        channel: {
+          id: channel.id,
+          title: channel.title,
+          youtube_channel_id: actualChannelId,
+          status: channel.status,
+          videoCount: channel.video_count || channelData.statistics?.videoCount || 'Unknown'
+        }
+      });
     }
 
     // Queue the channel for processing

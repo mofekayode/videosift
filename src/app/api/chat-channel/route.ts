@@ -57,22 +57,56 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Get channel details with ownership check
+    // Get channel details first
     const { data: channel, error: channelError } = await supabase
       .from('channels')
       .select('*')
       .eq('id', channelId)
-      .eq('owner_user_id', user?.id || null)
       .single();
     
     if (channelError || !channel) {
       return NextResponse.json(
-        { error: 'Channel not found or access denied' },
+        { error: 'Channel not found' },
         { status: 404 }
       );
     }
     
-    if (channel.status !== 'completed') {
+    // Check if user owns the channel OR has access via queue
+    const isOwner = user && channel.owner_user_id === user.id;
+    console.log('🔍 Access check:', { 
+      channelOwnerId: channel.owner_user_id, 
+      supabaseUserId: user?.id,
+      clerkUserId: userId,
+      isOwner 
+    });
+    
+    if (!isOwner && user) {
+      // Check queue access for authenticated users
+      const { data: queueEntry, error: queueError } = await supabase
+        .from('channel_queue')
+        .select('id')
+        .eq('channel_id', channelId)
+        .eq('requested_by', user.id)
+        .single();
+      
+      if (queueError || !queueEntry) {
+        console.error('User does not have access to this channel - not owner and no queue entry');
+        console.error('Owner check:', { channelOwnerId: channel.owner_user_id, userId: user?.id, isOwner });
+        console.error('Queue check:', { queueError, queueEntry });
+        return NextResponse.json(
+          { error: 'Channel not found or access denied' },
+          { status: 404 }
+        );
+      }
+    } else if (!user) {
+      // For anonymous users, deny access
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    if (channel.status !== 'ready') {
       return NextResponse.json(
         { error: 'Channel is not ready for chat. Status: ' + channel.status },
         { status: 400 }

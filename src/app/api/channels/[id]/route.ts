@@ -43,8 +43,8 @@ export async function GET(
       });
     }
     
-    // Fetch channel details with ownership check and include videos
-    const { data: channel, error } = await supabase
+    // First check if channel exists
+    const { data: channel, error: channelError } = await supabase
       .from('channels')
       .select(`
         *,
@@ -54,19 +54,42 @@ export async function GET(
           title,
           thumbnail_url,
           duration,
-          chunks_processed
+          chunks_processed,
+          transcript_cached
         )
       `)
       .eq('id', channelId)
-      .eq('owner_user_id', user.id)
       .single();
     
-    if (error) {
-      console.error('Error fetching channel:', error);
+    if (channelError || !channel) {
+      console.error('Channel not found:', channelError);
       return NextResponse.json(
         { error: 'Channel not found' },
         { status: 404 }
       );
+    }
+    
+    // Check if user owns the channel OR has access via queue
+    const isOwner = channel.owner_user_id === user.id;
+    
+    if (!isOwner) {
+      // Check queue access
+      const { data: queueEntry, error: queueError } = await supabase
+        .from('channel_queue')
+        .select('id')
+        .eq('channel_id', channelId)
+        .eq('requested_by', user.id)
+        .single();
+      
+      if (queueError || !queueEntry) {
+        console.error('User does not have access to this channel - not owner and no queue entry');
+        console.error('Owner check:', { channelOwnerId: channel.owner_user_id, userId: user.id, isOwner });
+        console.error('Queue check:', { queueError, queueEntry });
+        return NextResponse.json(
+          { error: 'Channel not found or access denied' },
+          { status: 404 }
+        );
+      }
     }
     
     // Cache the result

@@ -306,22 +306,25 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
       return null;
     }
 
-    // First check if channel already exists for this user
+    // Check if channel already exists (regardless of owner)
     const { data: existingChannel } = await supabaseAdmin
       .from('channels')
       .select('*')
       .eq('youtube_channel_id', channel.youtube_channel_id)
-      .eq('owner_user_id', channel.owner_user_id)
       .single();
 
     if (existingChannel) {
-      console.log('Channel already exists for this user:', existingChannel);
+      console.log('Channel already exists:', existingChannel);
+      // Return the existing channel - multiple users can process the same channel
+      // The channel processor will skip already processed videos
       return existingChannel;
     }
 
+    // Channel doesn't exist, create it with the first user as owner
+    // Other users can still access it via channel_queue
     const { data, error } = await supabaseAdmin
       .from('channels')
-      .insert([channel])
+      .insert([channel])  // Use the owner_user_id from the channel parameter
       .select()
       .single();
     
@@ -344,7 +347,9 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
 
 export async function getUserChannels(userId: string): Promise<Channel[]> {
   try {
-    const { data, error } = await supabase
+    // Get channels that the user either owns OR has access to through channel_queue
+    // First, get channels the user owns
+    const { data: ownedChannels, error: ownedError } = await supabase
       .from('channels')
       .select(`
         *,
@@ -354,15 +359,57 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
           title,
           thumbnail_url,
           duration,
-          chunks_processed
+          chunks_processed,
+          transcript_cached
         ),
         channel_queue!channel_queue_channel_id_fkey (*)
       `)
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
-    return data || [];
+    if (ownedError) throw ownedError;
+    
+    // Then, get channels the user has access to via channel_queue
+    const { data: queuedChannels, error: queueError } = await supabase
+      .from('channel_queue')
+      .select('channel_id')
+      .eq('requested_by', userId);
+    
+    if (queueError) throw queueError;
+    
+    // If user has queued channels, fetch those too
+    let accessedChannels: Channel[] = [];
+    if (queuedChannels && queuedChannels.length > 0) {
+      const queuedChannelIds = queuedChannels.map(q => q.channel_id);
+      
+      const { data: accessData, error: accessError } = await supabase
+        .from('channels')
+        .select(`
+          *,
+          videos!videos_channel_id_fkey (
+            id,
+            youtube_id,
+            title,
+            thumbnail_url,
+            duration,
+            chunks_processed
+          ),
+          channel_queue!channel_queue_channel_id_fkey (*)
+        `)
+        .in('id', queuedChannelIds)
+        .order('created_at', { ascending: false });
+      
+      if (accessError) throw accessError;
+      accessedChannels = accessData || [];
+    }
+    
+    // Combine and deduplicate channels
+    const allChannels = [...(ownedChannels || []), ...accessedChannels];
+    const uniqueChannels = Array.from(
+      new Map(allChannels.map(channel => [channel.id, channel])).values()
+    );
+    
+    return uniqueChannels;
   } catch (error) {
     console.error('Error fetching user channels:', error);
     return [];
@@ -375,6 +422,35 @@ export async function queueChannel(
   requestedBy: string
 ): Promise<ChannelQueue | null> {
   try {
+    console.log('🔄 Queueing channel:', { channelId, requestedBy });
+    
+    // Check if supabaseAdmin is available
+    if (!supabaseAdmin) {
+      console.error('❌ Supabase admin client not available for queueChannel');
+      return null;
+    }
+    
+    // First check if queue entry already exists for this user and channel
+    const { data: existingQueue, error: checkError } = await supabaseAdmin
+      .from('channel_queue')
+      .select('*')
+      .eq('channel_id', channelId)
+      .eq('requested_by', requestedBy)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 means no rows found, which is expected
+      console.error('❌ Error checking existing queue:', checkError);
+      throw checkError;
+    }
+    
+    if (existingQueue) {
+      console.log('✅ Queue entry already exists for user and channel:', existingQueue);
+      return existingQueue;
+    }
+    
+    // Create new queue entry
+    console.log('📝 Creating new queue entry...');
     const { data, error } = await supabaseAdmin
       .from('channel_queue')
       .insert([{
@@ -385,10 +461,15 @@ export async function queueChannel(
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating queue entry:', error);
+      throw error;
+    }
+    
+    console.log('✅ Queue entry created successfully:', data);
     return data;
   } catch (error) {
-    console.error('Error queueing channel:', error);
+    console.error('❌ Error queueing channel:', error);
     return null;
   }
 }
@@ -533,9 +614,11 @@ export async function createChatSession(
     if (channelId) {
       // For now, skip channel_id until migration is applied
       console.log('📝 Channel chat session requested - using temporary session');
+      // Generate a proper temporary ID that won't be saved to database
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       // Return a temporary session for channels until we have channel_id column
       return {
-        id: `channel_${channelId}_${Date.now()}`,
+        id: tempId,
         user_id: userId || null,
         anon_id: anonId || null,
         video_id: null,

@@ -16,7 +16,8 @@ import {
   Crown,
   TrendingUp,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  ClipboardCheck
 } from 'lucide-react';
 import { QuotaDashboard } from '@/components/dashboard/QuotaDashboard';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
@@ -252,6 +253,22 @@ function DashboardContent() {
                     </div>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                  
+                  {/* QA Checklist - Only show for admin */}
+                  {user?.emailAddresses?.[0]?.emailAddress === 'eyimofeblessing03@gmail.com' && (
+                    <Link href="/qa-checklist">
+                      <Button variant="outline" className="w-full justify-between h-auto p-4">
+                        <div className="text-left">
+                          <div className="font-medium flex items-center gap-2">
+                            <ClipboardCheck className="h-4 w-4" />
+                            QA Checklist
+                          </div>
+                          <div className="text-xs text-muted-foreground">Track testing progress</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>

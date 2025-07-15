@@ -4,6 +4,7 @@ import { ensureUserExists } from '@/lib/user-sync';
 import { OpenAI } from 'openai';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { hybridChunkSearch } from '@/lib/rag-search';
+import { filterChunksByContent, balanceChunksByVideo } from '@/lib/post-retrieval-filter';
 import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
 import { createChatSession, saveChatMessage, getChatMessageCount, getChatMessagesBySession } from '@/lib/database';
 import { trackApiError } from '@/lib/error-tracking';
@@ -169,7 +170,8 @@ export async function POST(request: NextRequest) {
     console.log(`📺 Found ${channelVideos.length} processed videos for channel`);
     
     // Search across all videos in the channel in parallel
-    const chunksPerVideo = Math.max(2, Math.floor(10 / channelVideos.length)); // Distribute chunks across videos
+    // Get more chunks per video to ensure we find all relevant content
+    const chunksPerVideo = 10; // Get 10 chunks from each video to better find specific content
     
     // Search all videos in parallel for better performance
     const searchPromises = channelVideos.map(async (video: any) => {
@@ -192,11 +194,14 @@ export async function POST(request: NextRequest) {
     const searchResults = await Promise.all(searchPromises);
     const allRelevantChunks = searchResults.flat();
     
-    // Sort all chunks by relevance and take top 6 for faster response
-    allRelevantChunks.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-    const topChunks = allRelevantChunks.slice(0, 6);
+    // Apply post-retrieval filtering to better match content
+    const filteredChunks = filterChunksByContent(allRelevantChunks, message);
+    
+    // Balance chunks across videos to ensure good coverage
+    const topChunks = balanceChunksByVideo(filteredChunks, 5, 30);
     
     console.log(`📦 Retrieved ${topChunks.length} relevant chunks across ${channelVideos.length} videos`);
+    console.log(`🎯 Top chunk scores: ${topChunks.slice(0, 3).map(c => (c.finalScore || c.similarity || 0).toFixed(3)).join(', ')}`);
     
     if (topChunks.length === 0) {
       return NextResponse.json(
@@ -256,8 +261,22 @@ CRITICAL RULES FOR CITATIONS:
 4. Never make up or guess timestamps
 5. DO NOT use generic ranges like [0:00 - 3:27] - be SPECIFIC
 6. Only cite the actual moment where the information appears
-7. NEVER cite the beginning of a video (0:00-0:30) unless something specific happens in those seconds
+7. Avoid lazy citations like bare "[0:00]" - but DO cite early moments if specific information appears there
 8. If you can't pinpoint when something was shown or discussed, don't make the claim
+
+IMPORTANT: When users ask for specific data, statistics, or numbers:
+- Carefully scan ALL provided video segments for the exact information
+- If the data is present, cite it with the specific timestamp and video
+- NEVER say information isn't in the videos without thoroughly checking all segments
+- Look for numbers, statistics, and data points throughout all videos
+
+CRITICAL: When users ask about specific people, topics, or events:
+- Search THOROUGHLY across ALL videos in the channel
+- Even if you don't find information in the first few segments, keep looking
+- Check every video that might contain relevant information
+- If someone or something is mentioned in ANY video, you should find it
+- IMPORTANT: Look for exact name matches - if a user asks about "Hussein Farhat", look for videos and segments that specifically mention "Hussein Farhat"
+- Pay special attention to video titles - if a video is titled with a person's name, that video likely contains significant content about them
 
 When answering:
 - Speak as if you've watched these videos, not read transcripts
@@ -272,8 +291,8 @@ GOOD citation examples:
 - "This is explained really well at [5:12] where they show..."
 
 BAD citation examples (NEVER DO THIS):
-- "[0:00 - 3:27]" (too broad, starts at beginning)
-- "[0:00]" (lazy, just the start)
+- "[0:00 - 3:27]" (too broad)
+- "[0:00]" (lazy citation without context)
 - "The transcript mentions..." (never say transcript!)
 
 Videos in this channel:
@@ -308,7 +327,7 @@ ${context}`;
       ],
       stream: true,
       temperature: 0.3,
-      max_tokens: 800, // Reduced for faster responses
+      max_tokens: 1000, // Slightly increased to allow for better responses
     });
     
     // Increment rate limit
@@ -386,14 +405,14 @@ ${context}`;
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'X-Session-ID': currentSessionId,
-        'X-Channel-Title': channel.title,
+        'X-Channel-Title': encodeURIComponent(channel.title), // Encode to handle Unicode characters
         'X-RateLimit-Limit-Hourly': updatedHourlyLimit.limit.toString(),
         'X-RateLimit-Remaining-Hourly': updatedHourlyLimit.remaining.toString(),
         'X-RateLimit-Reset-Hourly': Math.floor(updatedHourlyLimit.resetTime.getTime() / 1000).toString(),
         'X-RateLimit-Limit-Daily': updatedDailyLimit.limit.toString(),
         'X-RateLimit-Remaining-Daily': updatedDailyLimit.remaining.toString(),
         'X-RateLimit-Reset-Daily': Math.floor(updatedDailyLimit.resetTime.getTime() / 1000).toString(),
-        'X-Video-Mapping': JSON.stringify(timestampToVideo)
+        'X-Video-Mapping': encodeURIComponent(JSON.stringify(timestampToVideo)) // Encode JSON as well
       },
     });
     

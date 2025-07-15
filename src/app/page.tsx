@@ -175,10 +175,18 @@ export default function Home() {
         const data = await response.json();
 
         if (response.ok) {
-          toast.success(`Channel "${data.channel.title}" queued for processing. You'll receive an email when it's ready.`);
-          router.push('/dashboard');
+          if (data.alreadyProcessed) {
+            toast.success(`Great news! "${data.channel.title}" is already indexed and ready to chat with.`);
+          } else {
+            toast.success(`Channel "${data.channel.title}" queued for processing. You'll receive an email when it's ready.`);
+          }
+          router.push('/dashboard?tab=channels');
         } else {
           setError(data.error || 'Failed to process channel');
+          // Show quota exceeded message if applicable
+          if (data.quotaExceeded) {
+            toast.error(data.error);
+          }
         }
       } else {
         // Process video (existing logic)

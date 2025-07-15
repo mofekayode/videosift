@@ -17,6 +17,7 @@ import remarkGfm from 'remark-gfm';
 import { QueryCapIndicator } from '@/components/ui/query-cap-indicator';
 import { useRateLimit } from '@/hooks/useRateLimit';
 import { supabase } from '@/lib/supabase';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 interface ChatInterfaceProps {
   videoId?: string;
@@ -59,6 +60,9 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const { isSignedIn, user } = useUser();
   const { rateLimitData, updateFromResponse } = useRateLimit();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +80,7 @@ export function ChatInterface({
   const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const migrationAttemptedRef = useRef(false);
+  const urlCleanedRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -523,6 +528,13 @@ export function ChatInterface({
         const newSessionId = response.headers.get('X-Session-ID');
         if (newSessionId && !sessionId) {
           setSessionId(newSessionId);
+          
+          // Update URL to include session ID
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('q'); // Remove query param if it exists
+          newParams.set('session', newSessionId);
+          const newUrl = `${pathname}?${newParams.toString()}`;
+          router.replace(newUrl, { scroll: false });
         }
         
         // Get video mapping from headers for channel chat
@@ -530,7 +542,9 @@ export function ChatInterface({
         let videoMapping: Record<string, { videoId: string; title: string }> = {};
         if (videoMappingHeader) {
           try {
-            videoMapping = JSON.parse(videoMappingHeader);
+            // Decode the URI-encoded header first
+            const decodedMapping = decodeURIComponent(videoMappingHeader);
+            videoMapping = JSON.parse(decodedMapping);
             console.log('📺 Video mapping from API:', videoMapping);
           } catch (e) {
             console.error('Failed to parse video mapping:', e);
@@ -893,7 +907,24 @@ export function ChatInterface({
           <div className="relative">
             <Textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                
+                // Remove ?q= parameter when user starts typing
+                if (!urlCleanedRef.current && e.target.value.length > 0 && searchParams.get('q')) {
+                  urlCleanedRef.current = true;
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('q');
+                  
+                  // If we have a session ID, keep it in the URL
+                  if (sessionId) {
+                    newParams.set('session', sessionId);
+                  }
+                  
+                  const newUrl = newParams.toString() ? `${pathname}?${newParams.toString()}` : pathname;
+                  router.replace(newUrl, { scroll: false });
+                }
+              }}
               onKeyDown={handleKeyDown}
               placeholder={
                 sessionInfo?.remaining === 0 

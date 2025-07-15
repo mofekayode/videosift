@@ -1,33 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { processChannelQueue } from '@/lib/channel-processor';
 
 export async function POST(request: NextRequest) {
   try {
-    // This endpoint is for internal/cron job processing
-    // In production, you'd want to authenticate this endpoint or call it from a secure environment
+    const { userId } = await auth();
     
-    const result = await processChannelQueue();
-    
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        processed: result.processed,
-        channels: result.channels
-      });
-    } else {
+    if (!userId) {
       return NextResponse.json(
-        { 
-          success: false,
-          error: result.error || 'Failed to process channel queue' 
-        },
-        { status: 500 }
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
+
+    console.log('🚀 Manually triggering channel queue processing...');
     
+    // Process the channel queue
+    const result = await processChannelQueue();
+    
+    return NextResponse.json({
+      success: true,
+      result
+    });
+
   } catch (error) {
-    console.error('❌ Channel queue processing error:', error);
+    console.error('❌ Error processing channel queue:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Failed to process channel queue',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

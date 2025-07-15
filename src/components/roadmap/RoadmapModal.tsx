@@ -46,7 +46,7 @@ const roadmapFeatures: RoadmapFeature[] = [
   {
     id: 'file-upload',
     title: 'File Upload & Processing',
-    description: 'Upload your own video files, PDFs, and documents for AI-powered analysis.',
+    description: 'Upload your own video files. Integration with loom, zoom ,vimeo, slack etc.',
     status: 'coming-soon',
     icon: <Upload className="h-5 w-5" />,
     category: 'upload',
@@ -55,11 +55,11 @@ const roadmapFeatures: RoadmapFeature[] = [
   {
     id: 'enterprise-features',
     title: 'Enterprise Solutions',
-    description: 'Team workspaces, advanced analytics, custom integrations, and white-label options.',
+    description: 'Team workspaces, advanced analytics, ??? still figuring things out :)',
     status: 'planned',
     icon: <Building2 className="h-5 w-5" />,
     category: 'enterprise',
-    timeline: 'September 16th'
+    timeline: 'TBD'
   }
 ];
 
@@ -70,11 +70,11 @@ const statusConfig = {
 };
 
 const categoryConfig = {
-  search: { label: 'Search & Discovery', color: 'bg-purple-100 text-purple-800' },
-  multimodal: { label: 'Multimodal AI', color: 'bg-orange-100 text-orange-800' },
-  upload: { label: 'Content Upload', color: 'bg-blue-100 text-blue-800' },
-  enterprise: { label: 'Enterprise', color: 'bg-gray-100 text-gray-800' },
-  ai: { label: 'AI Features', color: 'bg-green-100 text-green-800' }
+  search: { label: 'Search & Discovery', color: 'bg-purple-100 text-purple-800 hover:bg-purple-200 hover:text-purple-900' },
+  multimodal: { label: 'Multimodal AI', color: 'bg-orange-100 text-orange-800 hover:bg-orange-200 hover:text-orange-900' },
+  upload: { label: 'Content Upload', color: 'bg-blue-100 text-blue-800 hover:bg-blue-200 hover:text-blue-900' },
+  enterprise: { label: 'Enterprise', color: 'bg-gray-100 text-gray-800 hover:bg-gray-200 hover:text-gray-900' },
+  ai: { label: 'AI Features', color: 'bg-green-100 text-green-800 hover:bg-green-200 hover:text-green-900' }
 };
 
 interface RoadmapModalProps {

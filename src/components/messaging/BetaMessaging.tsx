@@ -113,19 +113,21 @@ export function BetaMessaging({
       {true && (
         <Card className="border-zinc-700 bg-gradient-to-r from-zinc-900 to-zinc-800">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Badge variant="secondary" className="bg-zinc-700 text-zinc-100 gap-1 hover:bg-zinc-600 border-zinc-600">
-                <Sparkles className="h-3 w-3" />
-                FREE BETA
-              </Badge>
-              <p className="text-sm font-medium text-zinc-100">
-                Ask up to {quotaLimit} questions per day and index 1 YouTube channel
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-zinc-300">
-                Pro plans launch on August 5th. Early testers get 50% off for 2 months.
-              </p>
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-zinc-700 text-zinc-100 gap-1 hover:bg-zinc-600 border-zinc-600">
+                    <Sparkles className="h-3 w-3" />
+                    FREE BETA
+                  </Badge>
+                </div>
+                <p className="text-sm font-medium text-zinc-100">
+                  Ask up to {quotaLimit} questions per day
+                </p>
+                <p className="text-sm text-zinc-300">
+                  Index 1 YouTube channel (limited to last 20 videos)
+                </p>
+              </div>
               {!user ? (
                 <SignInButton mode="modal">
                   <Button 
@@ -173,7 +175,7 @@ export function BetaMessaging({
       </Card>
 
       {/* PRO PLAN Coming Soon Banner */}
-      {isNearQuotaLimit && (
+      {/* {isNearQuotaLimit && (
         <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
@@ -220,7 +222,7 @@ export function BetaMessaging({
             </div>
           </CardContent>
         </Card>
-      )}
+      )} */}
     </div>
   );
 }

@@ -18,6 +18,7 @@ interface Video {
   thumbnail_url?: string;
   duration?: number;
   chunks_processed?: boolean;
+  transcript_cached?: boolean;
 }
 
 interface Channel {
@@ -311,8 +312,15 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
             <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No channels indexed yet</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Add a YouTube channel URL above to get started
+             Go to home page to index channels
             </p>
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/')} 
+              className="mt-4"
+            >
+              Go to Home
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -443,9 +451,14 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
                   </div>
                   
                   {channel.status === 'ready' && (
-                    <p className="text-xs text-green-600 mt-1">
-                      Ready for chat • {channel.video_count || 0} videos indexed
-                    </p>
+                    <div className="text-xs text-green-600 mt-1">
+                      <p>Ready for chat • {channel.video_count || 0} videos indexed</p>
+                      {channel.total_video_count && channel.total_video_count > (channel.video_count || 0) && (
+                        <p className="text-amber-600 mt-0.5">
+                          {channel.total_video_count - (channel.video_count || 0)} videos couldn't be indexed (no captions)
+                        </p>
+                      )}
+                    </div>
                   )}
                   
                   {channel.status === 'processing' && channel.channel_queue?.[0] && (
@@ -509,6 +522,11 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
                                 <span className="flex items-center gap-1 text-green-600">
                                   <CheckCircle2 className="w-3 h-3" />
                                   Indexed
+                                </span>
+                              ) : video.transcript_cached === false ? (
+                                <span className="flex items-center gap-1 text-amber-600">
+                                  <AlertCircle className="w-3 h-3" />
+                                  No captions
                                 </span>
                               ) : (
                                 <span className="flex items-center gap-1">
