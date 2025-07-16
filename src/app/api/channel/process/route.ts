@@ -205,9 +205,12 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Channel queued for processing:', channel.title);
 
-    // Automatically trigger processing in the background
-    // We don't await this - let it run in the background
-    triggerChannelProcessing();
+    // On Vercel, we rely on cron jobs instead of background processing
+    // The cron job at /api/cron/process-channels will handle processing
+    if (process.env.VERCEL !== '1' && process.env.NODE_ENV === 'development') {
+      // Only trigger immediate processing in local development
+      triggerChannelProcessing();
+    }
 
     return NextResponse.json({
       success: true,

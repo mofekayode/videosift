@@ -1,0 +1,23 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/process-channels",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/check-new-videos",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/channel/process/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/process-channels/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/check-new-videos/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
