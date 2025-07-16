@@ -42,7 +42,7 @@ export async function sendChannelProcessingNotification(data: ChannelProcessingE
 
     console.log('📧 Attempting to send email with Resend...');
     const result = await resend.emails.send({
-      from: 'VidSift <onboarding@resend.dev>',
+      from: 'VidSift <noreply@vidsift.com>',
       to: data.userEmail,
       subject,
       html: emailContent
@@ -242,7 +242,7 @@ export async function sendWelcomeEmail(userEmail: string, userName: string) {
     console.log(`📧 Sending welcome email to ${userEmail}`);
 
     const result = await resend.emails.send({
-      from: 'VidSift <onboarding@resend.dev>',
+      from: 'VidSift <noreply@vidsift.com>',
       to: userEmail,
       subject: '🎉 Welcome to VidSift - Your AI YouTube Assistant!',
       html: getWelcomeEmailContent(userName)

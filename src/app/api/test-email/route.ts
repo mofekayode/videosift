@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
     // Try to send a test email
     console.log('📧 Sending test email...');
     const result = await resend.emails.send({
-      from: 'VidSift <onboarding@resend.dev>',
-      to: 'mofekayode@gmail.com', // Using the verified email for Resend test mode
-      subject: 'Test Email from VidSift',
+      from: 'VidSift <noreply@vidsift.com>',
+      to: 'mofe@prepproof.com', // Testing production mode
+      subject: 'Test Email from VidSift - Production Mode Test',
       html: `
-        <h1>Test Email</h1>
-        <p>This is a test email to verify that email sending is working correctly.</p>
+        <h1>Production Mode Test Email</h1>
+        <p>This is a test email to verify that Resend is now in production mode.</p>
         <p>Sent at: ${new Date().toISOString()}</p>
-        <p><strong>Note:</strong> In test mode, Resend only allows sending to mofekayode@gmail.com</p>
+        <p>If you receive this email at mofe@prepproof.com, it means Resend is successfully configured in production mode!</p>
       `
     });
 

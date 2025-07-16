@@ -27,13 +27,13 @@ export async function GET(request: NextRequest) {
     
     // Try to send a simple test email
     const result = await resend.emails.send({
-      from: 'MindSift <onboarding@resend.dev>',
-      to: 'mofekayode@gmail.com',
-      subject: '🧪 MindSift Email Test',
+      from: 'VidSift <noreply@vidsift.com>',
+      to: 'mofe@prepproof.com',
+      subject: '🧪 VidSift Email Test',
       html: `
         <div style="padding: 20px; font-family: system-ui;">
           <h2>Email Test Successful!</h2>
-          <p>This is a test email from MindSift to verify the email configuration is working properly.</p>
+          <p>This is a test email from VidSift to verify the email configuration is working properly.</p>
           <p>Time: ${new Date().toISOString()}</p>
         </div>
       `
