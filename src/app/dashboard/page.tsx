@@ -25,6 +25,7 @@ import { ChannelSelector } from '@/components/channels/ChannelSelector';
 import { BetaMessaging } from '@/components/messaging/BetaMessaging';
 import { ChatHistory } from '@/components/chat/ChatHistory';
 import { useQuota } from '@/hooks/useQuota';
+import { LoadingSpinner } from '@/components/ui/loading';
 import Link from 'next/link';
 
 function DashboardContent() {
@@ -189,10 +190,10 @@ function DashboardContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {new Date(user.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short' })}
+                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short' }) : 'N/A'}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(user.createdAt || Date.now()).getFullYear()}
+                    {user?.createdAt ? new Date(user.createdAt).getFullYear() : new Date().getFullYear()}
                   </p>
                 </CardContent>
               </Card>
@@ -289,7 +290,9 @@ function DashboardContent() {
                   Manage your indexed YouTube channels
                 </p>
               </div>
-              <ChannelSelector />
+              <Suspense fallback={<LoadingSpinner />}>
+                <ChannelSelector />
+              </Suspense>
             </div>
           </TabsContent>
 

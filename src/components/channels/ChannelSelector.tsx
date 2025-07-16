@@ -64,49 +64,61 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
     if (user) {
       fetchUserChannels();
       
-      // Set up realtime subscription
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      // Set up realtime subscription with error handling
+      let supabase;
+      try {
+        supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+      } catch (error) {
+        console.error('Failed to create Supabase client:', error);
+        return;
+      }
       
-      // Subscribe to channel changes
-      const channelSubscription = supabase
-        .channel('channel-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'channels'
-          },
-          (payload) => {
-            console.log('Channel change received:', payload);
-            fetchUserChannels();
-          }
-        )
-        .subscribe();
+      // Subscribe to channel changes with error handling
+      let channelSubscription: any;
+      let queueSubscription: any;
       
-      // Subscribe to channel_queue changes
-      const queueSubscription = supabase
-        .channel('queue-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'channel_queue'
-          },
-          (payload) => {
-            console.log('Queue change received:', payload);
-            fetchUserChannels();
-          }
-        )
-        .subscribe();
+      try {
+        channelSubscription = supabase
+          .channel('channel-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'channels'
+            },
+            (payload) => {
+              console.log('Channel change received:', payload);
+              fetchUserChannels();
+            }
+          )
+          .subscribe();
+        
+        queueSubscription = supabase
+          .channel('queue-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'channel_queue'
+            },
+            (payload) => {
+              console.log('Queue change received:', payload);
+              fetchUserChannels();
+            }
+          )
+          .subscribe();
+      } catch (error) {
+        console.error('Failed to set up realtime subscriptions:', error);
+      }
       
       return () => {
-        channelSubscription.unsubscribe();
-        queueSubscription.unsubscribe();
+        if (channelSubscription) channelSubscription.unsubscribe();
+        if (queueSubscription) queueSubscription.unsubscribe();
       };
     }
   }, [user]);
@@ -117,6 +129,12 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
       const response = await fetch('/api/user/channels');
       const data = await response.json();
 
+      if (!response.ok) {
+        console.error('API error response:', data);
+        setError(data.details || data.error || 'Failed to load channels');
+        return;
+      }
+      
       if (data.success) {
         setChannels(data.channels);
         // Check if any channels are pending
@@ -126,7 +144,8 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
         );
         setHasPendingChannels(pending);
       } else {
-        setError('Failed to load channels');
+        console.error('API returned success=false:', data);
+        setError(data.details || data.error || 'Failed to load channels');
       }
     } catch (error) {
       console.error('Error fetching channels:', error);
