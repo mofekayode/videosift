@@ -132,7 +132,10 @@ export async function GET(request: NextRequest) {
             
             // Download and process transcript in background
             try {
-              const transcriptResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/video/transcript`, {
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
+                ? `https://${process.env.VERCEL_URL}` 
+                : 'http://localhost:3000';
+              const transcriptResponse = await fetch(`${appUrl}/api/video/transcript`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ videoId: video.id.videoId }),

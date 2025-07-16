@@ -5,7 +5,10 @@ export async function GET(request: NextRequest) {
     console.log('🧪 Debug: Manually triggering channel queue processing...');
     
     // Call the channel processing endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/channel/process-queue`, {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000');
+    const response = await fetch(`${appUrl}/api/channel/process-queue`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
