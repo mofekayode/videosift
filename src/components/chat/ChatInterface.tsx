@@ -1018,8 +1018,9 @@ function MessageBubbleInternal({ message, onCitationClick, user, channelVideos =
           <button
             key={`ts-${match.index}-${startTimestamp}-${videoId || ''}`}
             onClick={() => handleCitationClick(displayText, videoId)}
-            className="text-[#2D9CFF] hover:text-[#1E8AE6] underline mx-1 font-mono text-sm"
+            className="text-[#2D9CFF] hover:text-[#1E8AE6] underline font-mono text-sm inline-flex items-center px-2 py-1 mx-1 rounded hover:bg-[#2D9CFF]/10 transition-colors touch-manipulation"
             title={videoId ? `Open "${videoTitle}" at ${startTimestamp}` : `Jump to ${startTimestamp}`}
+            style={{ minHeight: '32px' }} // Ensure minimum touch target size
           >
             [{displayText}]
           </button>

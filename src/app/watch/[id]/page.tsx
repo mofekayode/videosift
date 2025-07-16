@@ -12,6 +12,7 @@ import { ArrowLeft, ExternalLink, MessageSquare } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { RecentChatsSheet } from '@/components/chat/RecentChatsSheet';
+import { toast } from 'sonner';
 
 interface VideoData {
   id: string;
@@ -31,10 +32,15 @@ function WatchPageContent() {
   const sessionId = searchParams.get('session');
   const [isLoadingVideo, setIsLoadingVideo] = useState(false);
   const loadVideoCalledRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<'video' | 'chat'>('video');
   
-  // Debug logging
+  // Debug logging and auto-switch to chat tab if there's an initial question
   useEffect(() => {
     console.log('Watch page loaded with initialQuestion:', initialQuestion);
+    // On mobile, if there's an initial question, switch to chat tab
+    if (initialQuestion && window.innerWidth < 1024) {
+      setActiveTab('chat');
+    }
   }, [initialQuestion]);
   
   const [videoData, setVideoData] = useState<VideoData | null>(null);
@@ -174,6 +180,23 @@ function WatchPageContent() {
   };
 
   const handleCitationClick = (timestamp: string) => {
+    // On mobile, switch to video tab when citation is clicked
+    if (window.innerWidth < 1024 && activeTab === 'chat') {
+      setActiveTab('video');
+      toast.success(`Jumping to ${timestamp}`, {
+        duration: 2000,
+        position: 'top-center',
+      });
+      // Small delay to ensure tab switch completes before seeking
+      setTimeout(() => {
+        performSeek(timestamp);
+      }, 150);
+    } else {
+      performSeek(timestamp);
+    }
+  };
+
+  const performSeek = (timestamp: string) => {
     // Parse timestamp and seek to that time
     const parts = timestamp.split(':').map(Number);
     let seconds = 0;
@@ -250,10 +273,10 @@ function WatchPageContent() {
 
   return (
     <>
-      <div className="h-screen flex flex-col pt-2">
+      <div className="h-screen flex flex-col">
       
       {/* Header */}
-      <header className="border-b p-2 sm:p-4 flex items-center ml-8 sm:ml-12">
+      <header className="border-b p-2 sm:p-4 flex items-center">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/">
             <ArrowLeft className="w-4 h-4 sm:mr-2" />
@@ -261,9 +284,12 @@ function WatchPageContent() {
           </Link>
         </Button>
         <div className="min-w-0 flex-1 ml-2 sm:ml-4">
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="font-semibold text-sm sm:text-lg line-clamp-1">{videoData.title}</h1>
-            <Button variant="ghost" size="sm" asChild className="flex-shrink-0 h-6 px-2">
+          <h1 className="font-semibold text-sm sm:text-lg line-clamp-1">{videoData.title}</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-muted-foreground hidden sm:inline">
+              Duration: {formatDuration(videoData.duration)}
+            </p>
+            <Button variant="ghost" size="sm" asChild className="flex-shrink-0 h-5 px-1.5 -ml-1">
               <a 
                 href={`https://www.youtube.com/watch?v=${videoData.youtube_id}`}
                 target="_blank"
@@ -275,9 +301,6 @@ function WatchPageContent() {
               </a>
             </Button>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Duration: {formatDuration(videoData.duration)}
-          </p>
         </div>
         
         {/* Recent Chats Button */}
@@ -296,12 +319,46 @@ function WatchPageContent() {
         )}
       </header>
 
+      {/* Mobile Tabs */}
+      <div className="lg:hidden border-b bg-background sticky top-0 z-10">
+        <div className="flex">
+          <button
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+              activeTab === 'video' 
+                ? 'text-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('video')}
+          >
+            Video
+            {activeTab === 'video' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+              activeTab === 'chat' 
+                ? 'text-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('chat')}
+          >
+            Chat
+            {activeTab === 'chat' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Mobile/Tablet: Stacked vertically, Desktop: Side by side */}
+        {/* Desktop: Side by side, Mobile: Tab-based */}
         <div className="flex flex-col lg:flex-row w-full">
           {/* Video Player */}
-          <div className="w-full lg:w-1/2 flex flex-col">
+          <div className={`w-full lg:w-1/2 flex flex-col ${
+            activeTab === 'chat' ? 'hidden lg:flex' : ''
+          }`}>
             {/* Mobile: Fixed aspect ratio container */}
             <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r">
               <VideoPlayer 
@@ -344,7 +401,9 @@ function WatchPageContent() {
           </div>
 
           {/* Chat Interface */}
-          <div className="w-full lg:w-1/2 flex flex-col min-h-0 flex-1">
+          <div className={`w-full lg:w-1/2 flex flex-col min-h-0 flex-1 ${
+            activeTab === 'video' ? 'hidden lg:flex' : ''
+          }`}>
             {/* Mobile: Take remaining height, Desktop: Full height */}
             <div className="flex-1 min-h-0 lg:h-full">
               <ChatInterface

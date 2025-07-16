@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { VideoPlayer, VideoPlayerRef } from '@/components/video/VideoPlayer';
 import { ReferencedVideosList } from '@/components/chat/ReferencedVideosList';
+import { toast } from 'sonner';
 
 interface Channel {
   id: string;
@@ -42,6 +43,8 @@ export default function ChannelChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [channelVideos, setChannelVideos] = useState<any[]>([]);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
+  const [activeTab, setActiveTab] = useState<'videos' | 'chat'>('chat');
+  const [hasNewVideos, setHasNewVideos] = useState(false);
   
   // Debug when component mounts/unmounts
   useEffect(() => {
@@ -179,6 +182,12 @@ export default function ChannelChatPage() {
     console.log('Extracted referenced videos:', newRefs);
     console.log('Video mappings from messages:', messages.filter(m => m.videoMapping).map(m => m.videoMapping));
     console.log('===========================');
+    
+    // Check if we have new videos and we're on chat tab
+    if (newRefs.length > referencedVideos.length && activeTab === 'chat') {
+      setHasNewVideos(true);
+    }
+    
     setReferencedVideos(newRefs);
   }, [messages, channelVideos]);
 
@@ -297,12 +306,54 @@ export default function ChannelChatPage() {
         </div>
       </header>
 
+      {/* Mobile Tabs */}
+      <div className="lg:hidden border-b bg-background sticky top-0 z-10">
+        <div className="flex">
+          <button
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+              activeTab === 'chat' 
+                ? 'text-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => setActiveTab('chat')}
+          >
+            Chat
+            {activeTab === 'chat' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+          <button
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+              activeTab === 'videos' 
+                ? 'text-foreground' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => {
+              setActiveTab('videos');
+              setHasNewVideos(false);
+            }}
+          >
+            <span className="relative">
+              Videos {referencedVideos.length > 0 && `(${referencedVideos.length})`}
+              {hasNewVideos && activeTab === 'chat' && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
+            </span>
+            {activeTab === 'videos' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Mobile/Tablet: Stacked vertically, Desktop: Side by side */}
+        {/* Desktop: Side by side, Mobile: Tab-based */}
         <div className="flex flex-col lg:flex-row w-full">
           {/* Left Panel - Video Player and Referenced Videos */}
-          <div className="w-full lg:w-1/2 flex flex-col">
+          <div className={`w-full lg:w-1/2 flex flex-col ${
+            activeTab === 'chat' ? 'hidden lg:flex' : ''
+          }`}>
             <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r h-full overflow-hidden flex flex-col">
               {(referencedVideos.length === 0 && !currentVideo) ? (
                 <div className="bg-muted/50 rounded-lg p-8 text-center">
@@ -356,7 +407,9 @@ export default function ChannelChatPage() {
           </div>
 
           {/* Chat Interface */}
-          <div className="w-full lg:w-1/2 flex flex-col min-h-0 flex-1">
+          <div className={`w-full lg:w-1/2 flex flex-col min-h-0 flex-1 ${
+            activeTab === 'videos' ? 'hidden lg:flex' : ''
+          }`}>
             <div className="flex-1 min-h-0 lg:h-full">
               <ChatInterface
                 channelId={channel.id}
@@ -364,6 +417,10 @@ export default function ChannelChatPage() {
                 onMessagesUpdate={handleMessagesUpdate}
                 onCitationClick={(timestamp) => {
                   console.log('Citation clicked:', timestamp);
+                  
+                  // On mobile, switch to videos tab when citation is clicked
+                  const isMobile = window.innerWidth < 1024;
+                  
                   // Extract video info from the current context
                   // This will be called when a citation is clicked in the chat
                   if (referencedVideos.length > 0) {
@@ -384,6 +441,15 @@ export default function ChannelChatPage() {
                           seconds = parts[0] * 60 + parts[1];
                         } else if (parts.length === 3) {
                           seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                        }
+                        
+                        // Switch to videos tab on mobile
+                        if (isMobile && activeTab === 'chat') {
+                          setActiveTab('videos');
+                          toast.success(`Jumping to ${timestamp}`, {
+                            duration: 2000,
+                            position: 'top-center',
+                          });
                         }
                         
                         console.log('Setting current video:', video.videoId, 'at', seconds, 'seconds');

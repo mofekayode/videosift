@@ -151,7 +151,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
       <div 
         ref={containerRef}
         className="w-full aspect-video"
-        style={{ minHeight: '200px' }}
+        style={{ 
+          minHeight: '200px',
+          maxHeight: window.innerWidth < 768 ? '40vh' : '60vh' // Limit height on mobile
+        }}
       />
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted">
