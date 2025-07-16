@@ -70,6 +70,23 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
     
     for (const queueItem of queueItems) {
       try {
+        // Check if channel exists (join might have failed)
+        if (!queueItem.channels) {
+          console.error(`❌ Channel not found for queue item ${queueItem.id}, channel_id: ${queueItem.channel_id}`);
+          
+          // Mark queue item as failed
+          await supabaseAdmin
+            .from('channel_queue')
+            .update({ 
+              status: 'failed', 
+              completed_at: new Date().toISOString(),
+              error_message: 'Channel not found in database'
+            })
+            .eq('id', queueItem.id);
+          
+          continue;
+        }
+        
         // Mark queue item as processing
         await supabaseAdmin
           .from('channel_queue')
