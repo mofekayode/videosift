@@ -353,7 +353,7 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
       .from('channels')
       .select(`
         *,
-        videos!videos_channel_id_fkey (
+        videos:videos_channel_id_fkey (
           id,
           youtube_id,
           title,
@@ -362,7 +362,7 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
           chunks_processed,
           transcript_cached
         ),
-        channel_queue!channel_queue_channel_id_fkey (*)
+        channel_queue:channel_queue_channel_id_fkey (*)
       `)
       .eq('owner_user_id', userId)
       .order('created_at', { ascending: false });
@@ -386,7 +386,7 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
         .from('channels')
         .select(`
           *,
-          videos!videos_channel_id_fkey (
+          videos:videos_channel_id_fkey (
             id,
             youtube_id,
             title,
@@ -394,7 +394,7 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
             duration,
             chunks_processed
           ),
-          channel_queue!channel_queue_channel_id_fkey (*)
+          channel_queue:channel_queue_channel_id_fkey (*)
         `)
         .in('id', queuedChannelIds)
         .order('created_at', { ascending: false });
