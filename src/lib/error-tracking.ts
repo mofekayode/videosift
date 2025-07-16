@@ -109,10 +109,14 @@ class ErrorTracker {
     // Add to queue
     this.errorQueue.push(errorEvent);
 
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('🚨 Error tracked:', errorEvent);
-    }
+    // Log to console in development AND production temporarily
+    console.error('🚨 Error tracked:', errorEvent);
+    console.error('Error details:', {
+      id: errorEvent.id,
+      message: error.message,
+      stack: error.stack,
+      metadata: error.metadata
+    });
 
     // Flush immediately for critical errors
     if (error.severity === ErrorSeverity.CRITICAL) {

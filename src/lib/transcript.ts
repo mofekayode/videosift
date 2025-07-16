@@ -1,12 +1,28 @@
 import YoutubeTranscriptApi from 'youtube-transcript-api';
 import { TranscriptSegment } from '@/types';
 
+async function downloadWithRetry(videoId: string, retries = 3, delay = 5000): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await YoutubeTranscriptApi.getTranscript(videoId);
+    } catch (error: any) {
+      if (error.status === 429 && i < retries - 1) {
+        console.log(`⏳ Rate limited, waiting ${delay}ms before retry ${i + 1}/${retries}...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
 export async function downloadTranscript(videoId: string): Promise<TranscriptSegment[]> {
   try {
     console.log(`📥 Downloading transcript for video: ${videoId}`);
     
-    // Get the transcript using the static method (v2.0.4 API)
-    const transcript = await YoutubeTranscriptApi.getTranscript(videoId);
+    // Get the transcript with retry logic for rate limits
+    const transcript = await downloadWithRetry(videoId);
     console.log('✅ Raw transcript received:', transcript ? `${transcript.length} segments` : 'null/undefined');
     
     if (!transcript || transcript.length === 0) {
@@ -42,8 +58,8 @@ export async function downloadTranscript(videoId: string): Promise<TranscriptSeg
       throw new Error('This video is unavailable. It may be private, deleted, or restricted in your region.');
     } else if (error.message?.includes('fetch failed') || error.message?.includes('ENOTFOUND')) {
       throw new Error('Network error while downloading transcript. Please check your internet connection.');
-    } else if (error.message?.includes('Too Many Requests')) {
-      throw new Error('YouTube is temporarily blocking requests. Please try again in a few minutes.');
+    } else if (error.message?.includes('Too Many Requests') || error.status === 429 || error.code === 'ERR_BAD_REQUEST') {
+      throw new Error('YouTube is temporarily blocking requests due to rate limiting. Please wait a few minutes and try again.');
     }
     
     throw new Error(`Failed to analyze video: ${error instanceof Error ? error.message : 'Unknown error'}`);

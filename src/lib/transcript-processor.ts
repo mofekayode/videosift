@@ -13,15 +13,16 @@ export async function processTranscriptWithChunks(
 ) {
   try {
     // Check if video is already processed
-    const { data: video, error: videoError } = await supabaseAdmin
+    const { data: videos, error: videoError } = await supabaseAdmin
       .from('videos')
       .select('chunks_processed')
-      .eq('id', videoId)
-      .single();
+      .eq('id', videoId);
     
     if (videoError) {
       console.error('Error checking video status:', videoError);
     }
+    
+    const video = videos?.[0];
     
     if (video?.chunks_processed) {
       console.log('⚠️ Video already has chunks processed, checking chunk count...');

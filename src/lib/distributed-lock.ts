@@ -61,8 +61,11 @@ export class DistributedLock {
       this.locks.set(resourceId, timeout);
 
       return true;
-    } catch (error) {
-      console.error('Error acquiring lock:', error);
+    } catch (error: any) {
+      // Only log actual errors, not empty objects
+      if (error && (error.message || error.code || Object.keys(error).length > 0)) {
+        console.error('Error acquiring lock:', error);
+      }
       return false;
     }
   }

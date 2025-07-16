@@ -154,7 +154,7 @@ function getSuccessEmailContent(data: ChannelProcessingEmailData): string {
           <p style="font-size: 16px; line-height: 1.6;">You can now chat with your YouTube channel! Ask questions, get summaries, or explore topics across all ${data.videosProcessed} indexed videos.</p>
           
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}/dashboard?tab=channels" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.com'}/dashboard?tab=channels" class="button">
               Start Chatting with Your Channel
             </a>
           </div>
@@ -221,7 +221,7 @@ function getFailureEmailContent(data: ChannelProcessingEmailData): string {
           <p>In the meantime, you can still use VidSift with individual video URLs. Just paste any YouTube video link and start chatting!</p>
           
           <div style="text-align: center;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.com'}" class="button">
               Try with Individual Videos
             </a>
           </div>
@@ -305,7 +305,7 @@ function getWelcomeEmailContent(userName: string): string {
           </div>
           
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.ai'}" class="button">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://vidsift.com'}" class="button">
               Start Your First Chat
             </a>
           </div>

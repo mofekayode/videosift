@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+// Define types for the channel and video objects
+type Channel = {
+  id: string;
+  youtube_channel_id: string;
+  title: string;
+  last_indexed_at: string;
+  status: string;
+};
+
+type Video = {
+  id: string;
+  youtube_id: string;
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  duration: number;
+  channel_id: string;
+  transcript_cached: boolean;
+  published_at: string;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -24,7 +45,7 @@ export async function GET(request: NextRequest) {
       .select('id, youtube_channel_id, title, last_indexed_at')
       .eq('status', 'completed')
       .order('last_indexed_at', { ascending: true })
-      .limit(10); // Process 10 channels at a time
+      .limit(10) as { data: Channel[] | null, error: any }; // Process 10 channels at a time
     
     if (channelsError) {
       throw new Error(`Failed to fetch channels: ${channelsError.message}`);
@@ -39,7 +60,7 @@ export async function GET(request: NextRequest) {
     
     const results = [];
     
-    for (const channel of channels) {
+    for (const channel of channels as Channel[]) {
       try {
         console.log(`🔍 Checking channel: ${channel.title}`);
         
@@ -50,7 +71,7 @@ export async function GET(request: NextRequest) {
           .eq('channel_id', channel.id)
           .order('published_at', { ascending: false })
           .limit(1)
-          .single();
+          .single() as { data: { published_at: string } | null };
         
         const lastVideoDate = latestVideo?.published_at || channel.last_indexed_at;
         
@@ -102,7 +123,7 @@ export async function GET(request: NextRequest) {
                 published_at: video.snippet.publishedAt
               }])
               .select()
-              .single();
+              .single() as { data: Video | null, error: any };
             
             if (videoError) {
               console.error(`❌ Error creating video record for ${video.snippet.title}:`, videoError);
@@ -117,7 +138,7 @@ export async function GET(request: NextRequest) {
                 body: JSON.stringify({ videoId: video.id.videoId }),
               });
               
-              if (transcriptResponse.ok) {
+              if (transcriptResponse.ok && videoRecord) {
                 await supabaseAdmin
                   .from('videos')
                   .update({ transcript_cached: true })
