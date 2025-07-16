@@ -32,15 +32,31 @@ function WatchPageContent() {
   const sessionId = searchParams.get('session');
   const [isLoadingVideo, setIsLoadingVideo] = useState(false);
   const loadVideoCalledRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<'video' | 'chat'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | 'chat'>(
+    typeof window !== 'undefined' && window.innerWidth < 1024 ? 'chat' : 'video'
+  );
   
-  // Debug logging and auto-switch to chat tab if there's an initial question
+  // Set default tab based on screen size
   useEffect(() => {
-    console.log('Watch page loaded with initialQuestion:', initialQuestion);
-    // On mobile, if there's an initial question, switch to chat tab
-    if (initialQuestion && window.innerWidth < 1024) {
+    const handleResize = () => {
+      // Only change tab on initial mobile detection, not on every resize
+      if (window.innerWidth < 1024 && activeTab === 'video' && !videoData) {
+        setActiveTab('chat');
+      }
+    };
+
+    // Set initial tab on mount
+    if (window.innerWidth < 1024) {
       setActiveTab('chat');
     }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Watch page loaded with initialQuestion:', initialQuestion);
   }, [initialQuestion]);
   
   const [videoData, setVideoData] = useState<VideoData | null>(null);
