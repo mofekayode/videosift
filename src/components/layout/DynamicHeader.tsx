@@ -35,7 +35,7 @@ export function DynamicHeader() {
             height={24}
             className="w-6 h-6"
           />
-          <span className="font-semibold text-sm hidden sm:inline">VidSift</span>
+          <span className="font-semibold text-sm">VidSift</span>
         </Link>
 
         {/* User Controls - Right side */}
