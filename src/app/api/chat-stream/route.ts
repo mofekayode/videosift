@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Retrieve relevant chunks - increase to 10 for better context
-    const relevantChunks = await hybridChunkSearch(video.id, query, 10);
+    const relevantChunks = await hybridChunkSearch(video.id, video.youtube_id, query, 10);
 
     if (relevantChunks.length === 0) {
       return NextResponse.json(

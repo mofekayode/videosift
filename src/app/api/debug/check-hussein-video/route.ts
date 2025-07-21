@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     for (const query of testQueries) {
       console.log(`🔍 Testing search for: "${query}"`);
-      const chunks = await hybridChunkSearch(video.id, query, 5);
+      const chunks = await hybridChunkSearch(video.id, video.youtube_id, query, 5);
       
       searchResults[query] = {
         found: chunks.length,

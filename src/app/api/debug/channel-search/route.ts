@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Perform hybrid search
-          const searchResults = await hybridChunkSearch(video.id, searchQuery, 10);
+          const searchResults = await hybridChunkSearch(video.id, video.youtube_id, searchQuery, 10);
           
           // Get a sample of the actual text content for the top results
           const topResultsWithText = searchResults.slice(0, 3).map(chunk => ({

@@ -180,7 +180,13 @@ export async function POST(request: NextRequest) {
     // Search all videos in parallel for better performance
     const searchPromises = channelVideos.map(async (video: any) => {
       try {
-        const chunks = await hybridChunkSearch(video.id as string, message, chunksPerVideo);
+        // Skip videos without youtube_id
+        if (!video.youtube_id) {
+          console.warn(`⚠️ Video ${video.title} (${video.id}) has no youtube_id`);
+          return [];
+        }
+        
+        const chunks = await hybridChunkSearch(video.id as string, video.youtube_id, message, chunksPerVideo);
         
         // Add video context to each chunk
         return chunks.map(chunk => ({
@@ -189,7 +195,7 @@ export async function POST(request: NextRequest) {
           video_youtube_id: video.youtube_id
         }));
       } catch (error) {
-        console.error(`Error searching video ${video.id}:`, error);
+        console.error(`Error searching video ${video.title}:`, error);
         return [];
       }
     });
@@ -243,10 +249,10 @@ export async function POST(request: NextRequest) {
       if (!acc[videoKey]) {
         acc[videoKey] = {
           title: chunk.video_title,
-          chunks: []
+          chunks: [],
+          timestamps: new Set<string>()
         };
       }
-      acc[videoKey].chunks.push(chunk.text || '');
       
       // Store the chunk's time range for accurate timestamp mapping
       const startTime = Math.floor(chunk.start_time);
@@ -264,28 +270,42 @@ export async function POST(request: NextRequest) {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
       };
       
-      // Map the chunk's actual time range to this video
       const chunkTimestamp = formatTime(startTime);
+      acc[videoKey].timestamps.add(chunkTimestamp);
+      
+      // Always include timestamp with chunk text
+      const chunkWithTimestamp = `[At ${chunkTimestamp}]: ${chunk.text || ''}`;
+      acc[videoKey].chunks.push(chunkWithTimestamp);
+      
       timestampToVideo[chunkTimestamp] = {
         videoId: chunk.video_youtube_id,
         title: chunk.video_title
       };
       
       return acc;
-    }, {} as Record<string, { title: string; chunks: string[] }>);
+    }, {} as Record<string, { title: string; chunks: string[]; timestamps: Set<string> }>);
     
-    // Format context with video titles
+    // Format context with video titles and timestamps
     const context = Object.entries(videoGroups)
       .map(([youtubeId, group]) => {
         const typedGroup = group as { title: string; chunks: string[] };
-        return `**Video: ${typedGroup.title}**
+        // Find video duration
+        const video = channelVideos.find((v: any) => v.youtube_id === youtubeId) as any;
+        const duration = video?.duration || 0;
+        const durationStr = duration > 0 ? ` (Duration: ${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})` : '';
+        
+        return `**Video: ${typedGroup.title}${durationStr}**
 
 ${typedGroup.chunks.join('\n\n')}`;
       })
       .join('\n\n---\n\n');
     
     // Create a complete list of ALL videos in the channel for context
-    const allVideosList = (channelVideos as Array<{ id: string; title: string; youtube_id: string }>).map(v => `- ${v.title}`).join('\n');
+    const allVideosList = (channelVideos as Array<{ id: string; title: string; youtube_id: string; duration?: number }>).map(v => {
+      const duration = v.duration || 0;
+      const durationStr = duration > 0 ? ` (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})` : '';
+      return `- ${v.title}${durationStr}`;
+    }).join('\n');
     
     // Create chat completion
     // Create a mapping of video titles to YouTube IDs for citation formatting
@@ -297,15 +317,19 @@ ${typedGroup.chunks.join('\n\n')}`;
 
     const systemPrompt = `You are an AI assistant with comprehensive knowledge of this YouTube channel's content. You have watched and analyzed every video in this channel, understanding not just what was said, but the visual context, demonstrations, and nuances of each video.
 
+IMPORTANT: The timestamps in the video segments are marked as [At X:XX]. When you cite them, use the format [X:XX] "Video Title" with the video title in quotes. This allows users to click and go directly to that moment in the specific video.
+
 CRITICAL RULES FOR CITATIONS:
-1. ALWAYS use timestamps when referencing specific moments: [MM:SS] or [M:SS]
-2. Use the EXACT timestamps from the video segments you're referencing
-3. Mention which video the information comes from naturally in your response
-4. Never make up or guess timestamps
-5. DO NOT use generic ranges like [0:00 - 3:27] - be SPECIFIC
-6. Only cite the actual moment where the information appears
-7. Avoid lazy citations like bare "[0:00]" - but DO cite early moments if specific information appears there
-8. If you can't pinpoint when something was shown or discussed, don't make the claim
+1. ALWAYS provide citations when referencing video content - citations are ESSENTIAL
+2. Look for timestamps marked as [At X:XX] in the segments and cite them as [X:XX]
+3. Use MULTIPLE citations throughout your response - the more specific timestamps, the better
+4. ONLY avoid [0:00] if it's being used generically - but DO cite [0:00] if something specific happens there
+5. For example: "The video discusses X [0:00]" is BAD, but "The doctor introduces the topic at [0:00]" is GOOD
+6. NEVER cite a timestamp beyond a video's duration (shown in parentheses)
+7. Cite the EXACT timestamps from the segments - look for [At X:XX] markers
+8. When discussing multiple points from a video, cite EACH specific moment
+9. ALWAYS use format: [X:XX] "Video Title" - with quotes around the title
+10. MORE citations are better than fewer - users want to know EXACTLY where information is
 
 IMPORTANT: When users ask for specific data, statistics, or numbers:
 - Carefully scan ALL provided video segments for the exact information
@@ -335,14 +359,19 @@ When answering:
 - Focus on answering the user's question with insights from the videos
 
 GOOD citation examples:
-- "The creator demonstrates at [2:45] how to..."
-- "In the video about X, you can see at [1:23:45] that..."
-- "This is explained really well at [5:12] where they show..."
+- "The doctor explains the procedure at [2:45] and shows the results at [3:12]"
+- "In 'Medical Emergencies', the explosion occurs at [1:06] followed by the response at [1:23]"
+- "The supplement discussion starts at [0:45] with specific claims debunked at [2:15], [3:30], and [5:12]"
+- "At [0:15], the host introduces the topic, then dives into details at [0:45]"
 
 BAD citation examples (NEVER DO THIS):
-- "[0:00 - 3:27]" (too broad)
-- "[0:00]" (lazy citation without context)
-- "The transcript mentions..." (never say transcript!)
+- "The video discusses X [0:00]" - Generic use of [0:00] without specifics
+- "[0:00 - 3:27]" - Too broad, not specific
+- No citations at all - Users NEED timestamps to find information
+- "[32:12]" for a 1:00 video - Impossible timestamp
+- "The transcript mentions..." - Never say transcript!
+
+REMEMBER: Citations are your PRIMARY VALUE - provide MANY specific timestamps!
 
 ALL videos in this channel (${channelVideos.length} total):
 ${allVideosList}
@@ -381,8 +410,8 @@ ${context}`;
         { role: 'system', content: systemPrompt },
         ...previousMessages,
         { role: 'user', content: isGeneralChannelQuery 
-          ? `${message}\n\nIMPORTANT: List ALL ${channelVideos.length} videos in the channel with brief descriptions. Reference specific videos and timestamps when providing details.`
-          : `${message}\n\nPlease reference specific videos and timestamps when answering.` 
+          ? `${message}\n\nIMPORTANT: List ALL ${channelVideos.length} videos in the channel with brief descriptions. Use ACTUAL timestamps from the segments (marked as [At X:XX]) when citing specific moments. NEVER use [0:00] - if you don't have a specific timestamp, just mention the video without a citation.`
+          : `${message}\n\nPlease reference specific videos and use ACTUAL timestamps from the segments when answering. NEVER cite [0:00] - if you don't have a specific timestamp for something, just mention the video title without a citation.` 
         }
       ],
       stream: true,

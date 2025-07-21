@@ -986,8 +986,11 @@ function MessageBubbleInternal({ message, onCitationClick, user, channelVideos =
   const renderContentWithCitations = (content: string, _citations?: Citation[]) => {
     // Simple approach: directly process the content to replace timestamps
     const processTextWithTimestamps = (text: string) => {
-      // Match both formats: [timestamp] for single video and [timestamp] "Video Title" for channels
-      const timestampRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\](?:\s*"([^"]+)")?/g;
+      // Match multiple formats:
+      // 1. [timestamp] "Video Title" - preferred channel format
+      // 2. [timestamp] - fallback format
+      // 3. [At timestamp]: - format from segments
+      const timestampRegex = /\[(?:At\s+)?(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\](?:\s*[""]([^""]+)[""])?/g;
       const parts = [];
       let lastIndex = 0;
       let match;
@@ -1010,7 +1013,28 @@ function MessageBubbleInternal({ message, onCitationClick, user, channelVideos =
         // Find video ID from title if in channel mode
         let videoId: string | undefined;
         if (videoTitle && channelVideos.length > 0) {
-          const video = channelVideos.find(v => v.title === videoTitle);
+          // Normalize titles for comparison (handle HTML entities, case, etc.)
+          const normalizeTitle = (title: string) => {
+            return title
+              .toLowerCase()
+              .replace(/&amp;/g, '&')
+              .replace(/&#39;/g, "'")
+              .replace(/&quot;/g, '"')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .trim();
+          };
+          
+          const normalizedSearchTitle = normalizeTitle(videoTitle);
+          const video = channelVideos.find(v => 
+            normalizeTitle(v.title) === normalizedSearchTitle
+          );
+          
+          if (!video) {
+            console.warn(`Could not find video with title: "${videoTitle}"`);
+            console.log('Available videos:', channelVideos.map(v => v.title));
+          }
+          
           videoId = video?.youtube_id;
         }
         
@@ -1018,9 +1042,9 @@ function MessageBubbleInternal({ message, onCitationClick, user, channelVideos =
           <button
             key={`ts-${match.index}-${startTimestamp}-${videoId || ''}`}
             onClick={() => handleCitationClick(displayText, videoId)}
-            className="text-[#2D9CFF] hover:text-[#1E8AE6] underline font-mono text-sm inline-flex items-center px-2 py-1 mx-1 rounded hover:bg-[#2D9CFF]/10 transition-colors touch-manipulation"
+            className="text-[#2D9CFF] hover:text-[#1E8AE6] underline font-mono text-sm inline-flex items-center px-1 py-0.5 mx-0.5 rounded hover:bg-[#2D9CFF]/10 transition-colors touch-manipulation"
             title={videoId ? `Open "${videoTitle}" at ${startTimestamp}` : `Jump to ${startTimestamp}`}
-            style={{ minHeight: '32px' }} // Ensure minimum touch target size
+            style={{ minHeight: '24px' }} // Ensure minimum touch target size
           >
             [{displayText}]
           </button>

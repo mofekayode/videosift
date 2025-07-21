@@ -15,7 +15,7 @@ import { BetaMessaging } from '@/components/messaging/BetaMessaging';
 import { ChannelDropdown } from '@/components/channels/ChannelDropdown';
 import { useQuota } from '@/hooks/useQuota';
 import { trackEvent } from '@/lib/posthog';
-import { SignInButton, useUser } from '@clerk/nextjs';
+import { SignInButton, useUser, useAuth } from '@clerk/nextjs';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import { Footer } from '@/components/layout/Footer';
 export default function Home() {
   const router = useRouter();
   const { isSignedIn, isLoaded, user } = useUser();
+  const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState<'video' | 'channel'>('video');
   const [url, setUrl] = useState('');
   const [firstQuestion, setFirstQuestion] = useState('');
@@ -166,21 +167,24 @@ export default function Home() {
           return;
         }
         
-        // Process channel
-        const response = await fetch('/api/channel/process', {
+        // Process channel - USE BACKEND FOR CHANNEL PROCESSING
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const response = await fetch(`${backendUrl}/api/channels/process`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channelUrl: url }),
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.NEXT_PUBLIC_BACKEND_API_KEY || 'dev-api-key-12345', // Use API key for backend auth
+            'x-user-id': user?.id || '',
+            'x-user-email': user?.emailAddresses?.[0]?.emailAddress || ''
+          },
+          body: JSON.stringify({ channelId: url }),
         });
 
         const data = await response.json();
 
         if (response.ok) {
-          if (data.alreadyProcessed) {
-            toast.success(`Great news! "${data.channel.title}" is already indexed and ready to chat with.`);
-          } else {
-            toast.success(`Channel "${data.channel.title}" queued for processing. You'll receive an email when it's ready.`);
-          }
+          // Backend doesn't return channel details, just success message
+          toast.success(`Channel queued for processing! You'll receive an email when the first 2 videos are ready.`);
           router.push('/dashboard?tab=channels');
         } else {
           setError(data.error || 'Failed to process channel');

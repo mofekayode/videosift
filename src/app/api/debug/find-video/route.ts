@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       const husseinVideo = titleMatches[0];
       
       // Search this specific video
-      const chunks = await hybridChunkSearch(husseinVideo.id, searchQuery, 10);
+      const chunks = await hybridChunkSearch(husseinVideo.id, husseinVideo.youtube_id, searchQuery, 10);
       searchResults = {
         videoId: husseinVideo.id,
         videoTitle: husseinVideo.title,

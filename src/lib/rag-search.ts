@@ -23,6 +23,7 @@ interface RetrievedChunk {
 // Hybrid search combining semantic and keyword search
 export async function hybridChunkSearch(
   videoId: string,
+  youtubeId: string,
   query: string,
   topK: number = 5
 ): Promise<RetrievedChunk[]> {
@@ -124,9 +125,9 @@ export async function hybridChunkSearch(
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, topK);
   
-  // 7. Retrieve actual text for the chunks
+  // 7. Retrieve actual text for the chunks using YouTube ID
   const chunksWithText = await getChunksFromStorage(
-    videoId,
+    youtubeId,
     sortedResults.map(r => ({ 
       byte_offset: r.byte_offset, 
       byte_length: r.byte_length 
@@ -142,20 +143,21 @@ export async function hybridChunkSearch(
 // Stream chunks for real-time retrieval
 export async function* streamRelevantChunks(
   videoId: string,
+  youtubeId: string,
   query: string,
   topK: number = 5
 ) {
   // Get relevant chunks metadata
-  const chunks = await hybridChunkSearch(videoId, query, topK);
+  const chunks = await hybridChunkSearch(videoId, youtubeId, query, topK);
   
-  // Stream the actual text content
+  // Stream the actual text content using YouTube ID
   const chunkMetadata = chunks.map(c => ({
     byte_offset: c.byte_offset,
     byte_length: c.byte_length
   }));
   
   let index = 0;
-  for await (const chunkText of streamChunksFromStorage(videoId, chunkMetadata)) {
+  for await (const chunkText of streamChunksFromStorage(youtubeId, chunkMetadata)) {
     yield {
       ...chunks[index],
       text: chunkText

@@ -55,22 +55,95 @@ export function ChannelChatInterface({ channel }: ChannelChatInterfaceProps) {
   const extractVideoReferences = (content: string): Array<{ videoId: string; title: string; timestamps: string[] }> => {
     const videoRefs = new Map<string, { title: string; timestamps: Set<string> }>();
     
-    // Pattern to match "In the video 'Title' at [X:XX]"
-    const videoRefPattern = /In the video ['"](.+?)['"]\s*at\s*\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
+    // First, extract all timestamps
+    const timestampPattern = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
+    const timestamps: string[] = [];
     let match;
     
-    while ((match = videoRefPattern.exec(content)) !== null) {
-      const title = match[1];
-      const timestamp = match[2];
-      
-      // Find matching video from channel videos
-      const video = channel.videos?.find(v => v.title === title);
-      if (video) {
-        if (!videoRefs.has(video.youtube_id)) {
-          videoRefs.set(video.youtube_id, { title, timestamps: new Set() });
+    while ((match = timestampPattern.exec(content)) !== null) {
+      timestamps.push(match[1]);
+    }
+    
+    // Look for video references in numbered list format (as shown in screenshot)
+    // Pattern: "2. Alexandr Wang: Building Scale AI..." followed by timestamps
+    const numberedListPattern = /\d+\.\s*([^:]+?)(?::\s*[^[]+)?(?=\s*[-–]\s*|\s*\[)/g;
+    const videoMatches: { title: string; nearbyTimestamps: string[] }[] = [];
+    
+    // Split content into lines for better parsing
+    const lines = content.split('\n');
+    
+    lines.forEach((line, index) => {
+      // Check if this line contains a numbered item that might be a video title
+      const numberMatch = line.match(/^\d+\.\s*(.+?)(?:[-–:]|$)/);
+      if (numberMatch) {
+        const potentialTitle = numberMatch[1].trim();
+        
+        // Look for timestamps in this line and the next few lines
+        const nearbyTimestamps: string[] = [];
+        for (let i = index; i < Math.min(index + 3, lines.length); i++) {
+          const lineTimestamps = lines[i].match(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g);
+          if (lineTimestamps) {
+            lineTimestamps.forEach(ts => {
+              const timestamp = ts.match(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]/)?.[1];
+              if (timestamp) nearbyTimestamps.push(timestamp);
+            });
+          }
         }
-        videoRefs.get(video.youtube_id)!.timestamps.add(timestamp);
+        
+        if (nearbyTimestamps.length > 0) {
+          videoMatches.push({ title: potentialTitle, nearbyTimestamps });
+        }
       }
+    });
+    
+    // Match video titles to actual videos in the channel
+    videoMatches.forEach(({ title, nearbyTimestamps }) => {
+      // Find best matching video
+      const matchedVideo = channel.videos?.find(video => {
+        // Try exact match first
+        if (video.title === title) return true;
+        
+        // Try partial match - check if the title starts with the video title
+        if (title.toLowerCase().includes(video.title.toLowerCase())) return true;
+        if (video.title.toLowerCase().includes(title.toLowerCase())) return true;
+        
+        // Check if significant words match
+        const titleWords = title.toLowerCase().split(/\s+/);
+        const videoWords = video.title.toLowerCase().split(/\s+/);
+        const matchingWords = titleWords.filter(word => 
+          word.length > 3 && videoWords.includes(word)
+        );
+        return matchingWords.length >= 2;
+      });
+      
+      if (matchedVideo) {
+        if (!videoRefs.has(matchedVideo.youtube_id)) {
+          videoRefs.set(matchedVideo.youtube_id, {
+            title: matchedVideo.title,
+            timestamps: new Set()
+          });
+        }
+        nearbyTimestamps.forEach(ts => {
+          videoRefs.get(matchedVideo.youtube_id)!.timestamps.add(ts);
+        });
+      }
+    });
+    
+    // If no matches found but we have timestamps, associate with any mentioned videos
+    if (videoRefs.size === 0 && timestamps.length > 0) {
+      channel.videos?.forEach(video => {
+        const titleWords = video.title.split(/\s+/).filter(w => w.length > 3);
+        const mentioned = titleWords.some(word => 
+          content.toLowerCase().includes(word.toLowerCase())
+        );
+        
+        if (mentioned) {
+          videoRefs.set(video.youtube_id, {
+            title: video.title,
+            timestamps: new Set(timestamps)
+          });
+        }
+      });
     }
     
     return Array.from(videoRefs.entries()).map(([videoId, { title, timestamps }]) => ({
