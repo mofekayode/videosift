@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getUserChannels } from '@/lib/database';
 import { ensureUserExists } from '@/lib/user-sync';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,25 +29,17 @@ export async function GET(request: NextRequest) {
 
     console.log('📋 Fetching channels for Supabase user:', user.id, 'email:', user.email);
     
-    // Try using service role key directly for debugging
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.log('🔑 Using service role key for debugging');
-      const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+    // Debug: Check user_channels table directly
+    console.log('🔍 Debugging user_channels for user:', user.id);
+    const { data: userChannelRelations, error: relError } = await supabaseAdmin
+      .from('user_channels')
+      .select('channel_id')
+      .eq('user_id', user.id);
       
-      // Get user channels with admin client
-      const { data: userChannelRelations, error: relError } = await supabaseAdmin
-        .from('user_channels')
-        .select('channel_id')
-        .eq('user_id', user.id);
-        
-      if (relError) {
-        console.error('❌ Admin client error fetching user_channels:', relError);
-      } else {
-        console.log('✅ Admin client found user_channels:', userChannelRelations);
-      }
+    if (relError) {
+      console.error('❌ Error fetching user_channels:', relError);
+    } else {
+      console.log('✅ Found user_channels:', userChannelRelations);
     }
     
     const channels = await getUserChannels(user.id);
