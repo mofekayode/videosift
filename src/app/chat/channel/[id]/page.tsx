@@ -123,19 +123,34 @@ export default function ChannelChatPage() {
         // Use video mapping if available
         const videoMapping = msg.videoMapping || {};
         
-        // Extract all timestamps
-        const citationRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
+        // Extract all timestamps - handle both old and new formats
+        // Old format: [12:34]
+        // New format: [12:34] "Video Title"
+        const citationRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\](?:\s*"([^"]+)")?/g;
         let match;
         
         while ((match = citationRegex.exec(msg.content)) !== null) {
           const timestamp = match[2] ? `${match[1]} - ${match[2]}` : match[1];
           const startTimestamp = match[1]; // Use first timestamp for lookup
+          const videoTitle = match[3]; // Video title from new format
           
           // Check if we have a mapping for this timestamp
           let targetVideo = null;
           if (videoMapping[startTimestamp]) {
             const mappedVideoId = videoMapping[startTimestamp].videoId;
             targetVideo = channelVideos.find(v => v.youtube_id === mappedVideoId);
+            console.log('Found video from mapping:', targetVideo?.title);
+          }
+          
+          // If we have a video title from the citation, try to match it
+          if (!targetVideo && videoTitle) {
+            targetVideo = channelVideos.find(v => 
+              v.title.toLowerCase().includes(videoTitle.toLowerCase()) ||
+              videoTitle.toLowerCase().includes(v.title.toLowerCase())
+            );
+            if (targetVideo) {
+              console.log('Found video by title match:', targetVideo.title);
+            }
           }
           
           // Fallback: try to find video by looking for title in nearby text
@@ -148,6 +163,7 @@ export default function ChannelChatPage() {
             for (const video of channelVideos) {
               if (contextText.includes(video.title.toLowerCase())) {
                 targetVideo = video;
+                console.log('Found video by context:', targetVideo.title);
                 break;
               }
             }
@@ -156,6 +172,7 @@ export default function ChannelChatPage() {
           // Last fallback: use first video if we have any
           if (!targetVideo && channelVideos.length > 0) {
             targetVideo = channelVideos[0];
+            console.log('Using fallback first video:', targetVideo.title);
           }
           
           if (targetVideo) {
@@ -181,6 +198,7 @@ export default function ChannelChatPage() {
     console.log('Channel videos available:', channelVideos.map(v => ({ youtube_id: v.youtube_id, title: v.title })));
     console.log('Extracted referenced videos:', newRefs);
     console.log('Video mappings from messages:', messages.filter(m => m.videoMapping).map(m => m.videoMapping));
+    console.log('Total citations found:', videoMap.size);
     console.log('===========================');
     
     // Check if we have new videos and we're on chat tab
@@ -188,7 +206,14 @@ export default function ChannelChatPage() {
       setHasNewVideos(true);
     }
     
+    // Always update referenced videos, even if empty
     setReferencedVideos(newRefs);
+    
+    // Log warning if we found citations but no videos
+    if (msg.content && msg.content.includes('[') && newRefs.length === 0) {
+      console.warn('⚠️ Found citations in message but no videos were extracted!');
+      console.warn('Message content sample:', msg.content.substring(0, 500));
+    }
   }, [messages, channelVideos]);
 
   useEffect(() => {
