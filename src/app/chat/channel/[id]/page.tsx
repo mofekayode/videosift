@@ -365,12 +365,12 @@ export default function ChannelChatPage() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop: Side by side, Mobile: Tab-based */}
-        <div className="flex flex-col lg:flex-row w-full">
+        <div className="flex flex-col lg:flex-row w-full h-full">
           {/* Left Panel - Video Player and Referenced Videos */}
-          <div className={`w-full lg:w-1/2 flex flex-col ${
+          <div className={`w-full lg:w-1/2 flex flex-col h-full ${
             activeTab === 'chat' ? 'hidden lg:flex' : ''
           }`}>
-            <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r h-full overflow-hidden flex flex-col">
+            <div className="p-2 sm:p-4 border-b lg:border-b-0 lg:border-r h-full flex flex-col">
               {(referencedVideos.length === 0 && !currentVideo) ? (
                 <div className="bg-muted/50 rounded-lg p-8 text-center">
                   <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
