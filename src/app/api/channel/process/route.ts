@@ -25,6 +25,8 @@ async function triggerChannelProcessing() {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 CHANNEL PROCESS v2 - WITH VALIDATION');
+  
   try {
     const { userId } = await auth();
     
@@ -75,6 +77,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { channelUrl } = await request.json();
+    
+    // VERSION CHECK - Remove this after debugging
+    console.log('VERSION: v2-with-validation');
     
     if (!channelUrl) {
       return NextResponse.json(
