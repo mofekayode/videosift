@@ -108,7 +108,7 @@ export async function processVideoTranscript(youtubeVideoId: string): Promise<Pr
       // Process transcript with semantic chunking system
       try {
         console.log('🚀 Processing transcript with semantic chunks...');
-        const result = await processTranscriptWithChunks(video.id, segments);
+        const result = await processTranscriptWithChunks(video.id, youtubeVideoId, segments);
         console.log(`✅ Processed ${result.chunkCount} chunks`);
         
         return {

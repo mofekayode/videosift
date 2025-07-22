@@ -514,7 +514,7 @@ export default function Home() {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{videoPreview.title}</p>
-                          <p className="text-xs text-green-600 dark:text-green-400">Transcript ready. Ask away.</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">Transcript found. Ask away.</p>
                         </div>
                       </div>
                     )}

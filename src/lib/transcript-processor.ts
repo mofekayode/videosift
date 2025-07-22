@@ -9,6 +9,7 @@ const openai = new OpenAI({
 
 export async function processTranscriptWithChunks(
   videoId: string,
+  youtubeId: string,
   segments: TranscriptSegment[]
 ) {
   try {
@@ -41,8 +42,8 @@ export async function processTranscriptWithChunks(
       }
     }
     
-    // 1. Store transcript in Supabase Storage
-    const { path, chunks } = await storeTranscriptInStorage(videoId, segments);
+    // 1. Store transcript in Supabase Storage (using YouTube ID for path)
+    const { path, chunks } = await storeTranscriptInStorage(youtubeId, segments);
     
     // 2. Generate embeddings for each chunk
     const chunksWithEmbeddings = await Promise.all(

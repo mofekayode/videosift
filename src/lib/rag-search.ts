@@ -136,22 +136,14 @@ export async function hybridChunkSearch(
       }))
     );
   } catch (error) {
-    console.error('Failed to get chunks from storage, falling back to database:', error);
-    // Fallback: try to get chunks directly from database if storage fails
-    const chunkIds = sortedResults.map(r => r.id);
-    const { data: dbChunks } = await supabaseAdmin
-      .from('video_chunks')
-      .select('id, text')
-      .in('id', chunkIds);
-    
-    if (!dbChunks || dbChunks.length === 0) {
-      console.error('No chunks found in database either');
-      return [];
-    }
-    
-    // Map chunks back to original order
-    const chunkTextMap = new Map(dbChunks.map(c => [c.id, c.text]));
-    chunksWithText = sortedResults.map(r => chunkTextMap.get(r.id) || '');
+    console.error('Failed to get chunks from storage:', error);
+    console.error('Video ID:', youtubeId);
+    console.error('This video may need to be reprocessed to generate transcript chunks in storage.');
+    // Return empty chunks - the video needs to be reprocessed
+    return sortedResults.map(chunk => ({
+      ...chunk,
+      text: ''
+    }));
   }
   
   return sortedResults.map((chunk, i) => ({

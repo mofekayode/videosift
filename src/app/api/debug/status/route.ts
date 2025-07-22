@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Check what's in the database
     const video = await getVideoByYouTubeId(videoId);
     
-    // Get chunk count if video exists
+    // Get chunk count from transcript_chunks table if video exists
     let chunkCount = 0;
     if (video) {
       const { createClient } = await import('@supabase/supabase-js');
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       );
       
       const { count } = await supabase
-        .from('video_chunks')
+        .from('transcript_chunks')
         .select('*', { count: 'exact', head: true })
         .eq('video_id', video.id);
       

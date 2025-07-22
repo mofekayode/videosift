@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processAndCacheTranscript } from '@/lib/transcript';
-import { getVideoByYouTubeId } from '@/lib/database';
+import { processVideoTranscript } from '@/lib/process-video-transcript';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,45 +13,20 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Get video from database
-    const video = await getVideoByYouTubeId(videoId);
-    console.log('🗃️ Video found in database:', video ? 'Yes' : 'No');
+    // Process video transcript with chunks
+    const result = await processVideoTranscript(videoId);
     
-    if (!video) {
-      console.log('❌ Video not found in database');
-      return NextResponse.json(
-        { error: 'Video not found in database' },
-        { status: 404 }
-      );
-    }
-    
-    // Check if transcript is already cached
-    if (video.transcript_cached) {
-      console.log('✅ Transcript already cached');
+    if (result.success) {
       return NextResponse.json({
         success: true,
-        message: 'Transcript already cached',
-        cached: true
-      });
-    }
-    
-    // Process and cache transcript
-    const success = await processAndCacheTranscript(
-      video.youtube_id,
-      video.id,
-      video.channel_id || undefined
-    );
-    
-    if (success) {
-      return NextResponse.json({
-        success: true,
-        message: 'Transcript processed and cached successfully',
-        cached: true
+        message: result.message || 'Transcript processed successfully',
+        cached: result.cached || false,
+        chunkCount: result.chunkCount
       });
     } else {
       return NextResponse.json(
-        { error: 'Failed to process transcript' },
-        { status: 500 }
+        { error: result.error || 'Failed to process transcript' },
+        { status: result.error?.includes('not found') ? 404 : 500 }
       );
     }
     
