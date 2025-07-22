@@ -122,7 +122,8 @@ export async function getChunksFromStorage(
     .download(`${videoId}/transcript.txt`);
   
   if (error || !data) {
-    throw new Error(`Failed to download transcript: ${error?.message}`);
+    console.error('Transcript download error:', error);
+    throw new Error(`Failed to download transcript: ${error?.message || error || 'No data returned'}`);
   }
   
   // Read as text
@@ -145,7 +146,8 @@ export async function* streamChunksFromStorage(
     .download(`${videoId}/transcript.txt`);
   
   if (error || !data) {
-    throw new Error(`Failed to download transcript: ${error?.message}`);
+    console.error('Transcript download error:', error);
+    throw new Error(`Failed to download transcript: ${error?.message || error || 'No data returned'}`);
   }
   
   const reader = data.stream().getReader();
