@@ -682,9 +682,23 @@ export async function createChatSession(
   try {
     // Handle different session types
     if (channelId) {
-      // Create a real session for channel chats - store channel_id in video_ids field as JSON
-      sessionData.video_ids = JSON.stringify({ channelId });
-      console.log('📝 Creating channel chat session with channelId stored in video_ids');
+      // For now, skip channel_id until migration is applied
+      console.log('📝 Channel chat session requested - using temporary session');
+      // Generate a proper temporary ID that won't be saved to database
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // Return a temporary session for channels until we have channel_id column
+      return {
+        id: tempId,
+        user_id: userId || undefined,
+        anon_id: anonId || undefined,
+        video_id: undefined,
+        video_ids: undefined,
+        created_at: new Date().toISOString(),
+        device_fingerprint: deviceInfo?.deviceFingerprint || undefined,
+        client_ip: deviceInfo?.clientIp || undefined,
+        user_agent: deviceInfo?.userAgent || undefined,
+        updated_at: new Date().toISOString()
+      } as ChatSession;
     } else if (videoIds && videoIds.length === 1) {
       // Single video chat
       sessionData.video_id = videoIds[0];
