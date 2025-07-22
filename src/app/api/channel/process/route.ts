@@ -151,6 +151,20 @@ export async function POST(request: NextRequest) {
 
     const channelData = data.items[0];
     
+    // Validate that we have a proper YouTube channel ID
+    if (!actualChannelId || !actualChannelId.startsWith('UC')) {
+      console.error('Invalid YouTube channel ID:', actualChannelId);
+      return NextResponse.json(
+        { error: 'Invalid YouTube channel ID resolved. Please check the URL and try again.' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Creating channel with:', {
+      youtube_channel_id: actualChannelId,
+      title: channelData.snippet.title
+    });
+
     // Create channel record in database
     const channel = await createChannel({
       youtube_channel_id: actualChannelId,
