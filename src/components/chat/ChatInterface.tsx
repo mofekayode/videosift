@@ -1013,7 +1013,7 @@ export function ChatInterface({
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
-                Sign up to save this conversation
+                Sign up to save this conversation and get more messages
               </span>
             </div>
             <SignUpButton mode="modal">
