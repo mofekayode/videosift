@@ -811,6 +811,13 @@ export function ChatInterface({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      
+      // Check if at daily limit before calling sendMessage
+      const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
+      if (todayMessageCount >= dailyLimit) {
+        return; // Don't call sendMessage, let the existing code in sendMessage handle the feedback
+      }
+      
       sendMessage();
     }
   };
@@ -884,6 +891,13 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  // Check rate limit before processing
+                  const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
+                  if (todayMessageCount >= dailyLimit) {
+                    toast.error(`Daily limit reached! You've sent ${todayMessageCount} out of ${dailyLimit} messages today.`);
+                    return;
+                  }
+                  
                   const question = channelId ? "What topics are covered in this channel?" : "What is this video about?";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
@@ -897,7 +911,7 @@ export function ChatInterface({
                   handleAutoSearch(question);
                 }}
                 className="text-sm bg-background hover:bg-muted/50"
-                disabled={isLoading}
+                disabled={isLoading || todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())}
               >
                 {channelId ? "Topics covered" : "What is this video about?"}
               </Button>
@@ -905,6 +919,13 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  // Check rate limit before processing
+                  const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
+                  if (todayMessageCount >= dailyLimit) {
+                    toast.error(`Daily limit reached! You've sent ${todayMessageCount} out of ${dailyLimit} messages today.`);
+                    return;
+                  }
+                  
                   const question = "Give me the key takeaways";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
@@ -918,7 +939,7 @@ export function ChatInterface({
                   handleAutoSearch(question);
                 }}
                 className="text-sm bg-background hover:bg-muted/50"
-                disabled={isLoading}
+                disabled={isLoading || todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())}
               >
                Key takeaways
               </Button>
@@ -926,6 +947,13 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  // Check rate limit before processing
+                  const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
+                  if (todayMessageCount >= dailyLimit) {
+                    toast.error(`Daily limit reached! You've sent ${todayMessageCount} out of ${dailyLimit} messages today.`);
+                    return;
+                  }
+                  
                   const question = channelId ? "Give me insights from recent videos" : "Summarize the main points";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
@@ -939,7 +967,7 @@ export function ChatInterface({
                   handleAutoSearch(question);
                 }}
                 className="text-sm bg-background hover:bg-muted/50"
-                disabled={isLoading}
+                disabled={isLoading || todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())}
               >
                 {channelId ? "Recent insights" : "Summarize"}
               </Button>

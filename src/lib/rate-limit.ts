@@ -30,8 +30,8 @@ export interface QuotaConfig {
 
 export const QUOTA_CONFIG: QuotaConfig = {
   anonymous: {
-    chat_messages_per_day: 5,
-    chat_messages_per_hour: 5,
+    chat_messages_per_day: 6,
+    chat_messages_per_hour: 6,
     video_uploads_per_day: 2,
   },
   user: {
