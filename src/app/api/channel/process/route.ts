@@ -4,7 +4,7 @@ import { createChannel, queueChannel, getUserByClerkId } from '@/lib/database';
 import { extractChannelId } from '@/lib/youtube';
 import { ensureUserExists } from '@/lib/user-sync';
 import { checkRateLimit, getUserTier } from '@/lib/rate-limit';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 // Import the processing function
 import { processChannelQueue } from '@/lib/channel-processor';
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     if ((existingChannels || 0) >= channelLimit) {
       return NextResponse.json(
         { 
-          error: `You've reached your channel limit (${channelLimit}). ${tier === 'free' ? 'Premium users can index up to 10 channels.' : 'Contact support to increase your limit.'}`,
+          error: `You've reached your channel limit (${channelLimit}).Contact support to increase your limit.'}`,
           quotaExceeded: true,
           limit: channelLimit,
           used: existingChannels || 0
@@ -166,31 +166,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if channel is already processed
+    // Check if channel is already processed and has videos
     if (channel.status === 'ready') {
-      // Channel is already processed, just create queue entry for this user
-      const queueItem = await queueChannel(channel.id, user.id);
+      // Verify the channel actually has videos
+      const { count: videoCount } = await supabaseAdmin
+        .from('videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', channel.id);
       
-      if (!queueItem) {
-        return NextResponse.json(
-          { error: 'Failed to add channel access' },
-          { status: 500 }
-        );
-      }
-
-      console.log('✅ Channel already processed, added user access:', channel.title);
-
-      return NextResponse.json({
-        success: true,
-        alreadyProcessed: true,
-        channel: {
-          id: channel.id,
-          title: channel.title,
-          youtube_channel_id: actualChannelId,
-          status: channel.status,
-          videoCount: channel.video_count || channelData.statistics?.videoCount || 'Unknown'
+      console.log(`Channel ${channel.title} has ${videoCount} videos`);
+      
+      if (!videoCount || videoCount === 0) {
+        // Channel marked as ready but has no videos - reprocess it
+        console.log('⚠️ Channel marked as ready but has no videos, reprocessing...');
+        
+        // Update channel status back to pending
+        await supabaseAdmin
+          .from('channels')
+          .update({ status: 'pending' })
+          .eq('id', channel.id);
+        
+        // Continue with normal processing flow
+      } else {
+        // Channel is truly ready with videos, just add user access
+        const queueItem = await queueChannel(channel.id, user.id);
+        
+        if (!queueItem) {
+          return NextResponse.json(
+            { error: 'Failed to add channel access' },
+            { status: 500 }
+          );
         }
-      });
+
+        console.log('✅ Channel already processed with videos, added user access:', channel.title);
+
+        return NextResponse.json({
+          success: true,
+          alreadyProcessed: true,
+          channel: {
+            id: channel.id,
+            title: channel.title,
+            youtube_channel_id: actualChannelId,
+            status: channel.status,
+            videoCount: videoCount
+          }
+        });
+      }
     }
 
     // Queue the channel for processing
