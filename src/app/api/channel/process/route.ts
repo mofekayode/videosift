@@ -4,7 +4,7 @@ import { createChannel, queueChannel, getUserByClerkId } from '@/lib/database';
 import { extractChannelId } from '@/lib/youtube';
 import { ensureUserExists } from '@/lib/user-sync';
 import { checkRateLimit, getUserTier } from '@/lib/rate-limit';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // Import the processing function
 import { processChannelQueue } from '@/lib/channel-processor';
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const channelLimit = tier === 'premium' ? 10 : 1; // 1 for beta users, 10 for premium
     
     // Count existing channels through user_channels table
-    const { count: existingChannels, error: countError } = await supabase
+    const { count: existingChannels, error: countError } = await supabaseAdmin
       .from('user_channels')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
