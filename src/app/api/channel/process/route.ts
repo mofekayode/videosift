@@ -110,25 +110,49 @@ export async function POST(request: NextRequest) {
       );
     } else {
       // For custom URLs (@handle, /c/, /user/), we need to search for the channel
+      console.log(`🔍 Searching for channel handle: ${channelIdentifier}`);
       const searchResponse = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(channelIdentifier)}&maxResults=1&key=${process.env.YOUTUBE_API_KEY}`
       );
       
       if (!searchResponse.ok) {
-        throw new Error('Failed to search for channel');
+        const errorData = await searchResponse.json();
+        console.error('❌ YouTube Search API Error:', errorData);
+        throw new Error(`Failed to search for channel: ${errorData.error?.message || 'Unknown error'}`);
       }
       
       const searchData = await searchResponse.json();
+      console.log('🔍 Search API Response:', JSON.stringify(searchData, null, 2));
       
       if (!searchData.items || searchData.items.length === 0) {
+        console.error('❌ No channels found for identifier:', channelIdentifier);
         return NextResponse.json(
-          { error: 'Channel not found' },
+          { error: 'Channel not found. Please check the channel URL and try again.' },
           { status: 404 }
         );
       }
       
-      actualChannelId = searchData.items[0].id.channelId;
+      // Validate the channel ID from search results
+      const searchResult = searchData.items[0];
+      if (!searchResult.id || !searchResult.id.channelId) {
+        console.error('❌ Invalid search result structure:', searchResult);
+        return NextResponse.json(
+          { error: 'Invalid channel data received from YouTube' },
+          { status: 500 }
+        );
+      }
+      
+      actualChannelId = searchResult.id.channelId;
       console.log('🎯 Resolved channel ID:', actualChannelId);
+      
+      // Validate the resolved channel ID format
+      if (!actualChannelId.startsWith('UC') && !actualChannelId.startsWith('HC')) {
+        console.error('❌ Invalid resolved channel ID format:', actualChannelId);
+        return NextResponse.json(
+          { error: 'Invalid YouTube channel ID resolved. Please contact support.' },
+          { status: 500 }
+        );
+      }
       
       // Now fetch the full channel data
       response = await fetch(

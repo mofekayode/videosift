@@ -300,17 +300,31 @@ export async function updateVideoTranscriptStatus(videoId: string, cached: boole
 // Channel operations
 export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>): Promise<Channel | null> {
   try {
+    console.log('📝 createChannel called with:', {
+      youtube_channel_id: channel.youtube_channel_id,
+      title: channel.title,
+      owner_user_id: channel.owner_user_id
+    });
+    
     // Check if supabaseAdmin is available
     if (!supabaseAdmin) {
-      console.error('Supabase admin client not available');
+      console.error('❌ Supabase admin client not available');
       return null;
     }
     
     // Validate YouTube channel ID format
-    if (!channel.youtube_channel_id || 
-        (!channel.youtube_channel_id.startsWith('UC') && 
-         !channel.youtube_channel_id.startsWith('HC'))) {
-      console.error('Invalid YouTube channel ID format:', channel.youtube_channel_id);
+    if (!channel.youtube_channel_id) {
+      console.error('❌ Missing YouTube channel ID');
+      return null;
+    }
+    
+    // YouTube channel IDs must start with 'UC' (user channel) or 'HC' (handle channel)
+    // and be exactly 24 characters long
+    const isValidChannelId = /^(UC|HC)[a-zA-Z0-9_-]{22}$/.test(channel.youtube_channel_id);
+    
+    if (!isValidChannelId) {
+      console.error('❌ Invalid YouTube channel ID format:', channel.youtube_channel_id);
+      console.error('Expected format: UC/HC followed by 22 alphanumeric characters');
       return null;
     }
 
