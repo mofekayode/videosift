@@ -34,49 +34,55 @@ export function useQuota(): QuotaData {
         // Determine user type
         const userType = user ? 'user' : 'anonymous';
         
-        // Set initial limits based on user type
-        const baseQuotaLimit = 30; // Everyone gets 30 messages
-        const baseChannelLimit = 1;
+        // Set initial limits (will be updated from API)
+        let baseQuotaLimit = 30; // Default fallback
+        let baseChannelLimit = 1;
 
-        // Fetch real message count from API
+        // Fetch real usage stats from API
         let quotaUsed = 0;
         let channelsUsed = 0;
 
         try {
-          const headers: any = {};
-          
-          // For anonymous users, get anon ID from localStorage
-          if (!user) {
-            const anonId = localStorage.getItem('vidsift_anon_id');
-            if (anonId) {
-              headers['x-anon-id'] = anonId;
-            }
-          }
-          
-          console.log('🔍 useQuota: Fetching message count, user:', user?.id);
-          const response = await fetch('/api/user/message-count', { headers });
+          // Fetch usage stats which includes limits and current usage
+          console.log('🔍 useQuota: Fetching usage stats, user:', user?.id);
+          const response = await fetch('/api/user/usage-stats');
           if (response.ok) {
             const data = await response.json();
-            console.log('📊 useQuota: Message count response:', data);
-            quotaUsed = data.count || 0;
+            console.log('📊 useQuota: Usage stats response:', data);
+            
+            // Extract daily limits and usage
+            if (data.stats?.chat?.daily) {
+              baseQuotaLimit = data.stats.chat.daily.limit;
+              quotaUsed = data.stats.chat.daily.limit - data.stats.chat.daily.remaining;
+            }
+            
+            if (data.stats?.channelProcess) {
+              baseChannelLimit = data.stats.channelProcess.limit;
+              channelsUsed = data.stats.channelProcess.limit - data.stats.channelProcess.remaining;
+            }
           } else {
-            console.error('❌ useQuota: Failed to fetch message count, status:', response.status);
+            console.error('❌ useQuota: Failed to fetch usage stats, status:', response.status);
           }
         } catch (error) {
-          console.error('Failed to fetch message count from API:', error);
+          console.error('Failed to fetch usage stats from API:', error);
           
-          // Fallback to localStorage if API fails
-          const storageKey = user ? `quota_${user.id}` : 'quota_anonymous';
-          const storedData = localStorage.getItem(storageKey);
-          
-          if (storedData) {
-            try {
-              const parsed = JSON.parse(storedData);
-              quotaUsed = parsed.quotaUsed || 0;
-              channelsUsed = parsed.channelsUsed || 0;
-            } catch (error) {
-              console.error('Failed to parse stored quota data:', error);
+          // Fallback to message count API
+          try {
+            const headers: any = {};
+            if (!user) {
+              const anonId = localStorage.getItem('vidsift_anon_id');
+              if (anonId) {
+                headers['x-anon-id'] = anonId;
+              }
             }
+            
+            const response = await fetch('/api/user/message-count', { headers });
+            if (response.ok) {
+              const data = await response.json();
+              quotaUsed = data.count || 0;
+            }
+          } catch (error) {
+            console.error('Failed to fetch message count:', error);
           }
         }
 

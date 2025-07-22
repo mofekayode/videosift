@@ -167,6 +167,16 @@ export default function Home() {
           return;
         }
         
+        // Get the Supabase user ID
+        const userResponse = await fetch('/api/user/supabase-id');
+        if (!userResponse.ok) {
+          setError('Failed to get user data');
+          setIsProcessing(false);
+          return;
+        }
+        
+        const userData = await userResponse.json();
+        
         // Process channel - USE BACKEND FOR CHANNEL PROCESSING
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
         const response = await fetch(`${backendUrl}/api/channels/process`, {
@@ -174,8 +184,8 @@ export default function Home() {
           headers: { 
             'Content-Type': 'application/json',
             'x-api-key': process.env.NEXT_PUBLIC_BACKEND_API_KEY || 'dev-api-key-12345', // Use API key for backend auth
-            'x-user-id': user?.id || '',
-            'x-user-email': user?.emailAddresses?.[0]?.emailAddress || ''
+            'x-user-id': userData.supabaseUserId, // Send Supabase user ID, not Clerk ID
+            'x-user-email': userData.email || user?.emailAddresses?.[0]?.emailAddress || ''
           },
           body: JSON.stringify({ channelId: url }),
         });
@@ -183,14 +193,23 @@ export default function Home() {
         const data = await response.json();
 
         if (response.ok) {
-          // Backend doesn't return channel details, just success message
-          toast.success(`Channel queued for processing! You'll receive an email when the first 2 videos are ready.`);
-          router.push('/dashboard?tab=channels');
+          if (data.alreadyIndexed) {
+            toast.info('You already have access to this channel!');
+            router.push('/dashboard?tab=channels');
+          } else {
+            // Backend doesn't return channel details, just success message
+            toast.success(`Channel queued for processing! You'll receive an email when the videos are ready.`);
+            router.push('/dashboard?tab=channels');
+          }
         } else {
           setError(data.error || 'Failed to process channel');
           // Show quota exceeded message if applicable
           if (data.quotaExceeded) {
             toast.error(data.error);
+            // Optionally redirect to dashboard to show existing channels
+            setTimeout(() => {
+              router.push('/dashboard?tab=channels');
+            }, 2000);
           }
         }
       } else {

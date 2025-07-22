@@ -71,35 +71,33 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check if user owns the channel OR has access via queue
-    const isOwner = user && channel.owner_user_id === user.id;
-    console.log('🔍 Access check:', { 
-      channelOwnerId: channel.owner_user_id, 
-      supabaseUserId: user?.id,
-      clerkUserId: userId,
-      isOwner 
-    });
-    
-    if (!isOwner && user) {
-      // Check queue access for authenticated users
-      const { data: queueEntry, error: queueError } = await supabase
-        .from('channel_queue')
+    // Check if user has access to the channel via user_channels table
+    if (user) {
+      const { data: userChannelAccess, error: accessError } = await supabase
+        .from('user_channels')
         .select('id')
         .eq('channel_id', channelId)
-        .eq('requested_by', user.id)
+        .eq('user_id', user.id)
         .single();
       
-      if (queueError || !queueEntry) {
-        console.error('User does not have access to this channel - not owner and no queue entry');
-        console.error('Owner check:', { channelOwnerId: channel.owner_user_id, userId: user?.id, isOwner });
-        console.error('Queue check:', { queueError, queueEntry });
+      console.log('🔍 Access check:', { 
+        channelId, 
+        supabaseUserId: user?.id,
+        clerkUserId: userId,
+        hasAccess: !!userChannelAccess,
+        accessError
+      });
+      
+      if (accessError || !userChannelAccess) {
+        console.error('User does not have access to this channel');
+        console.error('Access check:', { channelId, userId: user.id, accessError });
         return NextResponse.json(
           { error: 'Channel not found or access denied' },
           { status: 404 }
         );
       }
-    } else if (!user) {
-      // For anonymous users, deny access
+    } else {
+      // For anonymous users, deny access to channels
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }

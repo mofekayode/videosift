@@ -48,11 +48,11 @@ export async function POST(request: NextRequest) {
     const tier = getUserTier(userId);
     const channelLimit = tier === 'premium' ? 10 : 1; // 1 for beta users, 10 for premium
     
-    // Count existing channels
+    // Count existing channels through user_channels table
     const { count: existingChannels, error: countError } = await supabase
-      .from('channels')
+      .from('user_channels')
       .select('*', { count: 'exact', head: true })
-      .eq('owner_user_id', user.id);
+      .eq('user_id', user.id);
     
     if (countError) {
       console.error('Error counting channels:', countError);

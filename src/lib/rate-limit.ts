@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 
 export interface RateLimit {
   identifier: string; // userId or IP address
@@ -36,7 +36,7 @@ export const QUOTA_CONFIG: QuotaConfig = {
   },
   user: {
     chat_messages_per_day: 30,
-    chat_messages_per_hour: 30,
+    chat_messages_per_hour:30,
     video_uploads_per_day: 10,
     channels_per_user: 1,
   },
@@ -81,8 +81,18 @@ export async function checkRateLimit(
       windowEnd.setDate(windowEnd.getDate() + 1);
     }
     
-    // Get current usage
-    const { data: currentUsage, error } = await supabase
+    // Get current usage - use admin client to bypass RLS
+    const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+    
+    console.log('🔍 Checking rate limit:', {
+      identifier,
+      action,
+      tier,
+      windowType,
+      windowStart: windowStart.toISOString()
+    });
+    
+    const { data: currentUsage, error } = await client
       .from('rate_limits')
       .select('*')
       .eq('identifier', identifier)
@@ -112,6 +122,15 @@ export async function checkRateLimit(
     const remaining = Math.max(0, limit - currentCount);
     const allowed = currentCount < limit;
     
+    console.log('📊 Rate limit check result:', {
+      currentCount,
+      limit,
+      remaining,
+      allowed,
+      hasError: !!error,
+      errorMessage: error?.message
+    });
+    
     return {
       allowed,
       limit,
@@ -122,12 +141,13 @@ export async function checkRateLimit(
     
   } catch (error) {
     console.error('Error checking rate limit:', error);
-    // Fail open - allow the request if we can't check
+    // Fail closed - deny the request if we can't check (safer)
     return {
-      allowed: true,
-      limit: 1000,
-      remaining: 999,
+      allowed: false,
+      limit: 0,
+      remaining: 0,
       resetTime: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
+      retryAfter: 3600 // 1 hour in seconds
     };
   }
 }
@@ -156,8 +176,18 @@ export async function incrementRateLimit(
       windowEnd.setDate(windowEnd.getDate() + 1);
     }
     
+    // Use admin client to bypass RLS
+    const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+    
+    console.log('📝 Incrementing rate limit:', {
+      identifier,
+      action,
+      windowType,
+      windowStart: windowStart.toISOString()
+    });
+    
     // Try to increment existing record
-    const { data: existing } = await supabase
+    const { data: existing } = await client
       .from('rate_limits')
       .select('*')
       .eq('identifier', identifier)
@@ -167,7 +197,7 @@ export async function incrementRateLimit(
     
     if (existing) {
       // Update existing record
-      const { error } = await supabase
+      const { error } = await client
         .from('rate_limits')
         .update({ 
           count: existing.count + 1,
@@ -178,7 +208,7 @@ export async function incrementRateLimit(
       return !error;
     } else {
       // Create new record
-      const { error } = await supabase
+      const { error } = await client
         .from('rate_limits')
         .insert({
           identifier,
@@ -216,11 +246,12 @@ export async function getUsageStats(
   let channelProcess = null;
   if (tier !== 'anonymous') {
     try {
-      // Count user's actual channels
-      const { count, error } = await supabase
-        .from('channels')
+      // Count user's actual channels through user_channels table - use admin client
+      const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+      const { count, error } = await client
+        .from('user_channels')
         .select('*', { count: 'exact', head: true })
-        .eq('owner_user_id', identifier);
+        .eq('user_id', identifier);
       
       const channelCount = count || 0;
       const limit = QUOTA_CONFIG[tier].channels_per_user;
@@ -252,7 +283,9 @@ export async function cleanupExpiredRateLimits(): Promise<void> {
   try {
     const now = new Date().toISOString();
     
-    const { error } = await supabase
+    // Use admin client to bypass RLS
+    const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+    const { error } = await client
       .from('rate_limits')
       .delete()
       .lt('expires_at', now);

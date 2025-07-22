@@ -59,6 +59,7 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasPendingChannels, setHasPendingChannels] = useState(false);
   const [expandedChannelId, setExpandedChannelId] = useState<string | null>(null);
+  const [isFixing, setIsFixing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -203,7 +204,7 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
   const handleDeleteChannel = async (channelId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent channel selection when clicking delete
     
-    if (!confirm('Are you sure you want to remove this channel? You can add it again later.')) {
+    if (!confirm('Remove this channel from your list? The channel data will be preserved and you can add it back later.')) {
       return;
     }
 
@@ -215,7 +216,7 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
       });
 
       if (response.ok) {
-        toast.success('Channel removed successfully');
+        toast.success('Channel removed from your list');
         // Remove channel from local state
         setChannels(channels.filter(c => c.id !== channelId));
       } else {
@@ -223,10 +224,39 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
         toast.error(error.error || 'Failed to remove channel');
       }
     } catch (error) {
-      console.error('Error deleting channel:', error);
+      console.error('Error removing channel access:', error);
       toast.error('Failed to remove channel');
     } finally {
       setDeletingChannelId(null);
+    }
+  };
+
+  const handleFixChannelRelations = async () => {
+    setIsFixing(true);
+    
+    try {
+      const response = await fetch('/api/admin/fix-channel-relations', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        if (data.fixed > 0) {
+          toast.success(`Fixed ${data.fixed} channel relations!`);
+          // Refresh channels to show the fixed ones
+          fetchUserChannels();
+        } else {
+          toast.info('No orphaned channels found');
+        }
+      } else {
+        toast.error(data.error || 'Failed to fix channel relations');
+      }
+    } catch (error) {
+      console.error('Error fixing channel relations:', error);
+      toast.error('Failed to fix channel relations');
+    } finally {
+      setIsFixing(false);
     }
   };
 
@@ -333,13 +363,28 @@ export function ChannelSelector({ onChannelSelect, selectedChannelId }: ChannelS
             <p className="text-sm text-muted-foreground mt-2">
              Go to home page to index channels
             </p>
-            <Button 
-              variant="outline" 
-              onClick={() => router.push('/')} 
-              className="mt-4"
-            >
-              Go to Home
-            </Button>
+            <div className="flex gap-2 justify-center mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/')} 
+              >
+                Go to Home
+              </Button>
+              {/* <Button 
+                variant="outline" 
+                onClick={handleFixChannelRelations}
+                disabled={isFixing}
+              >
+                {isFixing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Fixing...
+                  </>
+                ) : (
+                  'Fix Missing Channels'
+                )}
+              </Button> */}
+            </div>
           </div>
         </CardContent>
       </Card>

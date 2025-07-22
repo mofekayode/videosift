@@ -39,7 +39,7 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
           youtube_channel_id,
           title,
           status,
-          owner_user_id
+          original_owner_id
         ),
         users!channel_queue_requested_by_fkey (
           id,
@@ -138,7 +138,7 @@ export async function processChannelQueue(): Promise<ProcessChannelQueueResult> 
             email: queueItem.users?.email,
             userId: queueItem.users?.id,
             requestedBy: queueItem.requested_by,
-            channelOwnerId: queueItem.channels.owner_user_id
+            channelOwnerId: queueItem.channels.original_owner_id
           });
           
           // Send success email to the user who requested the processing

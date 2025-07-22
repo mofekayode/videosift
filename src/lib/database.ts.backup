@@ -50,7 +50,7 @@ export async function createUser(clerkId: string, email: string): Promise<User |
       .single();
     
     if (error) throw error;
-    return data as User;
+    return data;
   } catch (error) {
     console.error('Error creating user:', error);
     return null;
@@ -66,7 +66,7 @@ export async function getUserByClerkId(clerkId: string): Promise<User | null> {
       .single();
     
     if (error) throw error;
-    return data as User;
+    return data;
   } catch (error) {
     console.error('Error fetching user:', error);
     return null;
@@ -91,7 +91,7 @@ export async function createVideo(video: Omit<Video, 'id' | 'created_at'>): Prom
       }
       throw error;
     }
-    return data as Video;
+    return data;
   } catch (error) {
     console.error('Error creating video:', error);
     return null;
@@ -107,7 +107,7 @@ export async function getVideoByYouTubeId(youtubeId: string): Promise<Video | nu
       .single();
     
     if (error) throw error;
-    return data as Video;
+    return data;
   } catch (error) {
     console.error('Error fetching video:', error);
     return null;
@@ -335,7 +335,7 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
       
       // Return the existing channel - multiple users can process the same channel
       // The channel processor will skip already processed videos
-      return existingChannel as Channel;
+      return existingChannel;
     }
 
     // Channel doesn't exist, create it
@@ -384,7 +384,7 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
       }
     }
     
-    return data as Channel;
+    return data;
   } catch (error) {
     console.error('Error creating channel:', error);
     return null;
@@ -393,40 +393,22 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
 
 export async function getUserChannels(userId: string): Promise<Channel[]> {
   try {
-    console.log('🔍 Fetching channels for user:', userId);
-    
-    // Use admin client if available (server-side), otherwise use regular client
-    const client = typeof window === 'undefined' && supabaseAdmin ? supabaseAdmin : supabase;
-    
     // Get channels that the user has access to through the user_channels table
-    const { data: userChannelRelations, error: relError } = await client
+    const { data: userChannelRelations, error: relError } = await supabase
       .from('user_channels')
       .select('channel_id')
       .eq('user_id', userId);
     
-    if (relError) {
-      console.error('❌ Error fetching user_channels:', relError);
-      console.error('Error details:', {
-        code: relError.code,
-        message: relError.message,
-        details: relError.details,
-        hint: relError.hint
-      });
-      throw relError;
-    }
-    
-    console.log('📋 User channel relations found:', userChannelRelations);
+    if (relError) throw relError;
     
     if (!userChannelRelations || userChannelRelations.length === 0) {
-      console.log('⚠️ No channel relations found for user');
       return [];
     }
     
     // Get the actual channel data for these channels
     const channelIds = userChannelRelations.map(rel => rel.channel_id);
-    console.log('🔍 Fetching channels with IDs:', channelIds);
     
-    const { data: channels, error: channelsError } = await client
+    const { data: channels, error: channelsError } = await supabase
       .from('channels')
       .select(`
         *,
@@ -444,18 +426,7 @@ export async function getUserChannels(userId: string): Promise<Channel[]> {
       .in('id', channelIds)
       .order('created_at', { ascending: false });
     
-    if (channelsError) {
-      console.error('❌ Error fetching channels:', channelsError);
-      console.error('Error details:', {
-        code: channelsError.code,
-        message: channelsError.message,
-        details: channelsError.details,
-        hint: channelsError.hint
-      });
-      throw channelsError;
-    }
-    
-    console.log(`✅ Found ${channels?.length || 0} channels`);
+    if (channelsError) throw channelsError;
     
     return channels || [];
   } catch (error) {
@@ -515,7 +486,7 @@ export async function queueChannel(
     }
     
     console.log('✅ Queue entry created successfully:', data);
-    return data as ChannelQueue;
+    return data;
   } catch (error) {
     console.error('❌ Error queueing channel:', error);
     return null;
@@ -533,7 +504,7 @@ export async function getQueueStatus(channelId: string): Promise<ChannelQueue | 
       .single();
     
     if (error) throw error;
-    return data as ChannelQueue;
+    return data;
   } catch (error) {
     console.error('Error fetching queue status:', error);
     return null;
@@ -693,7 +664,7 @@ export async function createChatSession(
     
     if (error) throw error;
     console.log('✅ Chat session created:', data?.id);
-    return data as ChatSession;
+    return data;
   } catch (error) {
     console.error('Error creating chat session:', error);
     console.error('Session data attempted:', sessionData);
@@ -710,7 +681,7 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
       .single();
     
     if (error) throw error;
-    return data as ChatSession;
+    return data;
   } catch (error) {
     console.error('Error fetching chat session:', error);
     return null;
@@ -727,7 +698,7 @@ export async function getChatSessionByAnonId(videoId: string, anonId: string): P
       .single();
     
     if (error) throw error;
-    return data as ChatSession;
+    return data;
   } catch (error) {
     console.error('Error fetching chat session by anon_id:', error);
     return null;

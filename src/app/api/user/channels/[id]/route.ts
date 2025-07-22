@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { supabase } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/user-sync';
+import { createClient } from '@supabase/supabase-js';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
   try {
     const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: 'Not authenticated' },
         { status: 401 }
       );
     }
@@ -27,46 +26,40 @@ export async function DELETE(
       );
     }
 
-    const channelId = id;
-
-    // Verify the user has access to this channel via queue
-    const { data: queueEntry, error: fetchError } = await supabase
-      .from('channel_queue')
-      .select('*')
-      .eq('channel_id', channelId)
-      .eq('requested_by', user.id)
-      .single();
-
-    if (fetchError || !queueEntry) {
-      return NextResponse.json(
-        { error: 'Channel not found or access denied' },
-        { status: 404 }
-      );
-    }
-
-    // Remove user's access to the channel by deleting their queue entry
-    // This preserves the channel and videos for other users who may have indexed it
+    const channelId = params.id;
+    
+    console.log('🗑️ Removing channel access for user:', user.id, 'channel:', channelId);
+    
+    // Create Supabase client with service role for admin operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    // Delete the user-channel relationship
     const { error: deleteError } = await supabase
-      .from('channel_queue')
+      .from('user_channels')
       .delete()
-      .eq('channel_id', channelId)
-      .eq('requested_by', user.id);
-
+      .eq('user_id', user.id)
+      .eq('channel_id', channelId);
+    
     if (deleteError) {
-      console.error('Error removing channel access:', deleteError);
+      console.error('❌ Error removing channel access:', deleteError);
       return NextResponse.json(
         { error: 'Failed to remove channel access' },
         { status: 500 }
       );
     }
-
+    
+    console.log('✅ Successfully removed channel access');
+    
     return NextResponse.json({
       success: true,
-      message: 'Channel removed successfully'
+      message: 'Channel access removed successfully'
     });
-
+    
   } catch (error) {
-    console.error('Channel deletion error:', error);
+    console.error('❌ Error in DELETE /api/user/channels/[id]:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

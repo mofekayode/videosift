@@ -18,6 +18,7 @@ import { QueryCapIndicator } from '@/components/ui/query-cap-indicator';
 import { useRateLimit } from '@/hooks/useRateLimit';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface ChatInterfaceProps {
   videoId?: string;
@@ -59,7 +60,7 @@ export function ChatInterface({
   onMessagesUpdate
 }: ChatInterfaceProps) {
   const { isSignedIn, user } = useUser();
-  const { rateLimitData, updateFromResponse } = useRateLimit();
+  const { rateLimitData, updateFromResponse, refreshRateLimit } = useRateLimit();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -78,6 +79,8 @@ export function ChatInterface({
     remaining: number;
   } | null>(null);
   const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
+  const [messageCountLoaded, setMessageCountLoaded] = useState<boolean>(false);
+  const [showLimitError, setShowLimitError] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const migrationAttemptedRef = useRef(false);
   const urlCleanedRef = useRef(false);
@@ -329,21 +332,42 @@ export function ChatInterface({
         console.log('📊 Count value:', data.count);
         console.log('📊 Setting todayMessageCount to:', data.count || 0);
         setTodayMessageCount(data.count || 0);
+        setMessageCountLoaded(true);
         
-        // Debug - check if state is actually updating
+        // Log current state after setting
         setTimeout(() => {
-          console.log('📊 After setState, todayMessageCount should be:', data.count || 0);
+          console.log('📊 State check - todayMessageCount should be:', data.count || 0);
         }, 100);
       } catch (error) {
         console.error('❌ Failed to fetch message count:', error);
+        setMessageCountLoaded(true); // Still mark as loaded to unblock UI
       }
     };
 
-    // Always fetch if user is signed in, or if we have an anon ID
-    if (isSignedIn || anonId) {
-      fetchMessageCount();
+    // Fetch immediately on mount and when auth changes
+    fetchMessageCount();
+  }, [isSignedIn, user?.id]); // Simplified dependencies
+
+  // Refetch message count after each message
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant') {
+        // Refetch count after getting a response
+        const headers: any = {};
+        if (!isSignedIn && anonId) {
+          headers['x-anon-id'] = anonId;
+        }
+        fetch('/api/user/message-count', { headers })
+          .then(res => res.json())
+          .then(data => {
+            console.log('📊 Updated message count after response:', data.count);
+            setTodayMessageCount(data.count || 0);
+          })
+          .catch(err => console.error('Failed to refresh message count:', err));
+      }
     }
-  }, [isSignedIn, user, anonId]); // Only fetch on auth changes, not message updates
+  }, [messages.length]); // Trigger when messages array changes
 
   // Initialize session on component mount
   useEffect(() => {
@@ -353,6 +377,17 @@ export function ChatInterface({
         const deviceAnonId = await getOrCreateDeviceAnonId();
         setAnonId(deviceAnonId);
         console.log('🔐 Using device-based anon ID:', deviceAnonId);
+        
+        // Fetch message count for anonymous user
+        const headers = { 'x-anon-id': deviceAnonId };
+        fetch('/api/user/message-count', { headers })
+          .then(res => res.json())
+          .then(data => {
+            setTodayMessageCount(data.count || 0);
+        setMessageCountLoaded(true);
+            console.log('📊 Initial message count for anon user:', data.count);
+          })
+          .catch(err => console.error('Failed to fetch initial message count:', err));
       });
       // Reset migration flag when user logs out
       migrationAttemptedRef.current = false;
@@ -378,10 +413,10 @@ export function ChatInterface({
               // Clear anonymous ID after successful migration
               localStorage.removeItem('vidsift_anon_id');
               setAnonId(null);
-              // Refresh message count after migration
-              const response = await fetch('/api/user/message-count');
-              const data = await response.json();
-              setTodayMessageCount(data.count || 0);
+              // Refresh rate limit after migration
+              if (refreshRateLimit) {
+                refreshRateLimit();
+              }
             }
           } catch (error) {
             // Don't throw or show error to user - migration is optional
@@ -401,6 +436,21 @@ export function ChatInterface({
       console.log('Auto-search triggered for:', initialQuestion);
       setAutoSearchExecuted(true);
       
+      // Check if user has already exceeded limit before auto-searching
+      const dailyLimit = rateLimitData?.daily.limit || 17;
+      if (todayMessageCount >= dailyLimit) {
+        console.log('🚫 Auto-search blocked: Daily limit exceeded');
+        const limitMessage: ChatMessage = {
+          id: Date.now().toString(),
+          session_id: '',
+          role: 'assistant',
+          content: `You've reached your daily limit of ${dailyLimit} messages. Please try again tomorrow.`,
+          created_at: new Date().toISOString(),
+        };
+        setMessages([limitMessage]);
+        return;
+      }
+      
       // Set up the initial message first
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -413,7 +463,7 @@ export function ChatInterface({
       setMessages([userMessage]);
       setInput('');
     }
-  }, [initialQuestion, videoId, autoSearchExecuted]);
+  }, [initialQuestion, videoId, autoSearchExecuted, todayMessageCount, rateLimitData]);
 
   // Separate effect to handle the actual search after message is set
   useEffect(() => {
@@ -451,6 +501,14 @@ export function ChatInterface({
   const handleAutoSearch = async (query: string) => {
     if (!query.trim() || isLoading) return;
     if (!videoId && !channelId) return;
+    
+    // Check rate limit before processing auto-search
+    const dailyLimit = rateLimitData?.daily.limit || 17;
+    if (todayMessageCount >= dailyLimit) {
+      console.log('🚫 Auto-search blocked in handleAutoSearch: Daily limit exceeded');
+      setIsLoading(false);
+      return;
+    }
 
     // Wait for anonId if not signed in
     let currentAnonId = anonId;
@@ -496,17 +554,37 @@ export function ChatInterface({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         
-        // Handle rate limit (session limit reached)
-        if (response.status === 429 && errorData.limitReached) {
+        // Handle rate limit
+        if (response.status === 429) {
           const limitMessage: ChatMessage = {
             id: (Date.now() + 1).toString(),
             session_id: sessionId || '',
             role: 'assistant',
-            content: errorData.error,
+            content: errorData.error || 'Rate limit exceeded',
             created_at: new Date().toISOString(),
           };
           setMessages(prev => [...prev, limitMessage]);
           setIsLoading(false);
+          
+          // Show toast for rate limit errors
+          const messageCount = errorData.messageCount || todayMessageCount;
+          const limit = errorData.limit || rateLimitData?.daily.limit || 17;
+          
+          toast.error(`Daily limit exceeded! You've sent ${messageCount} out of ${limit} messages today.`, {
+            duration: 5000,
+            position: 'top-center',
+            style: {
+              background: 'rgb(127 29 29)',
+              color: 'white',
+              border: '1px solid rgb(185 28 28)',
+            },
+          });
+          
+          // Update local message count if server provided it
+          if (errorData.messageCount) {
+            setTodayMessageCount(errorData.messageCount);
+          }
+          
           return;
         }
         
@@ -633,6 +711,19 @@ export function ChatInterface({
 
         setMessages(prev => [...prev, assistantMessage]);
         setIsLoading(false);
+        
+        // Refresh message count after getting response
+        const headers: any = {};
+        if (!isSignedIn && anonId) {
+          headers['x-anon-id'] = anonId;
+        }
+        fetch('/api/user/message-count', { headers })
+          .then(res => res.json())
+          .then(data => {
+            setTodayMessageCount(data.count || 0);
+            setMessageCountLoaded(true);
+          })
+          .catch(err => console.error('Failed to refresh message count:', err));
       }
     } catch (error) {
       console.error('❌ Chat error:', error);
@@ -671,12 +762,59 @@ export function ChatInterface({
       setMessages(prev => [...prev, assistantErrorMessage]);
     } finally {
       setIsLoading(false);
+      
+      // Refresh message count after any response (success or error)
+      const headers: any = {};
+      if (!isSignedIn && anonId) {
+        headers['x-anon-id'] = anonId;
+      }
+      fetch('/api/user/message-count', { headers })
+        .then(res => res.json())
+        .then(data => setTodayMessageCount(data.count || 0))
+        .catch(err => console.error('Failed to refresh message count:', err));
     }
   };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
     if (!videoId && !channelId) return;
+    if (!messageCountLoaded) {
+      console.log('⏳ Waiting for message count to load...');
+      return;
+    }
+    
+    // Check rate limit before sending - use actual message count
+    const dailyLimit = rateLimitData?.daily.limit || 17;
+    if (todayMessageCount >= dailyLimit) {
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        session_id: sessionId || '',
+        role: 'assistant',
+        content: `⚠️ You've reached your daily limit of ${dailyLimit} messages. Please try again tomorrow.`,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setInput(''); // Clear the input so user knows their action was processed
+      
+      // Show visual feedback
+      setShowLimitError(true);
+      setTimeout(() => setShowLimitError(false), 3000); // Hide after 3 seconds
+      
+      // Show toast notification for better visibility
+      toast.error(`Daily limit reached! You've sent ${todayMessageCount} out of ${dailyLimit} messages today.`, {
+        duration: 5000,
+        position: 'top-center',
+        style: {
+          background: 'rgb(127 29 29)',
+          color: 'white',
+          border: '1px solid rgb(185 28 28)',
+        },
+      });
+      
+      // Scroll to bottom to show the error message
+      setTimeout(() => scrollToBottom(), 100);
+      return;
+    }
 
     // Ensure we have anonId for anonymous users
     let currentAnonId = anonId;
@@ -896,8 +1034,21 @@ export function ChatInterface({
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MessageCircle className="w-4 h-4" />
-            <span>You&apos;re at <span className="font-semibold text-foreground">{todayMessageCount} / 30</span> free questions today</span>
+            <span>You&apos;re at <span className="font-semibold text-foreground">{todayMessageCount} / {rateLimitData?.daily.limit || 17}</span> free questions today</span>
           </div>
+          
+          {/* Rate Limit Error Banner */}
+          {showLimitError && (
+            <div className="mt-2 p-4 bg-red-100 dark:bg-red-950/40 border-2 border-red-500 dark:border-red-600 rounded-lg shadow-lg animate-pulse">
+              <p className="text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 animate-bounce" />
+                Daily limit reached! You've used all {rateLimitData?.daily.limit || 17} messages for today.
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 ml-7">
+                Try again tomorrow or upgrade for more messages.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -927,17 +1078,21 @@ export function ChatInterface({
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                sessionInfo?.remaining === 0 
-                  ? "Session limit reached - start a new chat" 
-                  : "What do you want to know next?"
+                !messageCountLoaded
+                  ? "Loading message count..."
+                  : todayMessageCount >= (rateLimitData?.daily.limit || 17)
+                  ? `Daily limit reached (${rateLimitData?.daily.limit || 17} messages). Try again tomorrow.`
+                  : sessionInfo?.remaining === 0 
+                    ? "Session limit reached - start a new chat" 
+                    : "What do you want to know next?"
               }
-              disabled={isLoading || (sessionInfo?.remaining === 0)}
-              className="w-full resize-none border-0 bg-muted/50 rounded-xl p-4 pr-12 text-sm focus:ring-0 focus:outline-none focus:border-transparent focus:ring-transparent focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/60 min-h-[60px] max-h-40"
+              disabled={isLoading || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || 17)}
+              className={`w-full resize-none border-0 bg-muted/50 rounded-xl p-4 pr-12 text-sm focus:ring-0 focus:outline-none focus:border-transparent focus:ring-transparent focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/60 min-h-[60px] max-h-40 ${showLimitError ? 'animate-shake' : ''}`}
               rows={2}
             />
             <Button 
               onClick={sendMessage} 
-              disabled={isLoading || !input.trim() || (sessionInfo?.remaining === 0)}
+              disabled={isLoading || !input.trim() || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || 17)}
               size="icon"
               className="absolute right-2 bottom-2 h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted"
             >

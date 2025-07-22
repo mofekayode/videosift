@@ -23,23 +23,23 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Get sessions for anonymous user
-      const { data: sessions, error } = await supabase
-        .from('chat_sessions')
+      // Get messages for anonymous user
+      const { data: messages, error } = await supabase
+        .from('chat_messages')
         .select(`
           id,
+          content,
+          role,
           created_at,
-          video_id,
-          anon_id,
-          user_id,
-          chat_messages (
+          session_id,
+          chat_sessions!inner (
             id,
-            content,
-            role,
-            created_at
+            anon_id,
+            video_id
           )
         `)
-        .eq('anon_id', anonId)
+        .eq('chat_sessions.anon_id', anonId)
+        .eq('role', 'user')
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString())
         .order('created_at', { ascending: false });
@@ -53,14 +53,8 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Count messages
-      let totalCount = 0;
-      for (const session of sessions || []) {
-        totalCount += session.chat_messages?.filter(m => m.role === 'user').length || 0;
-      }
-
       return NextResponse.json({
-        count: totalCount,
+        count: messages?.length || 0,
         sessions: []
       });
     }
@@ -75,23 +69,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all sessions for today with message counts
-    const { data: sessions, error } = await supabase
-      .from('chat_sessions')
+    // Get all messages for today (not sessions created today)
+    const { data: messages, error } = await supabase
+      .from('chat_messages')
       .select(`
         id,
+        content,
+        role,
         created_at,
-        video_id,
-        user_id,
-        anon_id,
-        chat_messages (
+        session_id,
+        chat_sessions!inner (
           id,
-          content,
-          role,
-          created_at
+          user_id,
+          video_id
         )
       `)
-      .eq('user_id', user.id)
+      .eq('chat_sessions.user_id', user.id)
+      .eq('role', 'user')
       .gte('created_at', today.toISOString())
       .lt('created_at', tomorrow.toISOString())
       .order('created_at', { ascending: false });
@@ -105,27 +99,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Count total USER messages across all sessions
-    let totalCount = 0;
-    const sessionSummaries = [];
-
-    for (const session of sessions || []) {
-      const userMessages = session.chat_messages?.filter(m => m.role === 'user') || [];
-      const messageCount = userMessages.length;
-      totalCount += messageCount;
-
-      // Get first user message for session summary
-      const firstMessage = session.chat_messages?.find(m => m.role === 'user');
-      
-      if (firstMessage) {
-        sessionSummaries.push({
-          id: session.id,
-          firstMessage: firstMessage.content.substring(0, 100) + '...',
-          messageCount,
-          timestamp: session.created_at
-        });
+    // Count is simply the number of user messages today
+    const totalCount = messages?.length || 0;
+    
+    // Group messages by session for summary
+    const sessionMap = new Map();
+    for (const msg of messages || []) {
+      const sessionId = msg.session_id;
+      if (!sessionMap.has(sessionId)) {
+        sessionMap.set(sessionId, []);
       }
+      sessionMap.get(sessionId).push(msg);
     }
+    
+    const sessionSummaries = Array.from(sessionMap.entries()).map(([sessionId, msgs]) => ({
+      id: sessionId,
+      firstMessage: msgs[msgs.length - 1].content.substring(0, 100) + '...', // Oldest message first
+      messageCount: msgs.length,
+      timestamp: msgs[msgs.length - 1].created_at
+    }));
 
 
     return NextResponse.json({

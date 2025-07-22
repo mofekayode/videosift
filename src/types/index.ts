@@ -25,8 +25,9 @@ export interface Channel {
   id: string;
   youtube_channel_id: string;
   title: string;
-  owner_user_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  original_owner_id?: string;  // Made optional since it might not always be present
+  owner_user_id?: string;  // Keep for backward compatibility temporarily
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'ready';
   video_count?: number;
   last_indexed_at?: string;
   assistant_id?: string;

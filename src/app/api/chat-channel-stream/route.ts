@@ -5,7 +5,7 @@ import { OpenAI } from 'openai';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { hybridChunkSearch } from '@/lib/rag-search';
 import { filterChunksByContent, balanceChunksByVideo } from '@/lib/post-retrieval-filter';
-import { checkRateLimit, incrementRateLimit, getUserTier, getClientIP } from '@/lib/rate-limit';
+import { getUserTier, getClientIP, QUOTA_CONFIG } from '@/lib/rate-limit';
 import { createChatSession, saveChatMessage, getChatMessageCount, getChatMessagesBySession } from '@/lib/database';
 import { trackApiError } from '@/lib/error-tracking';
 import { logger, LogCategory, logApiRequest } from '@/lib/logger';
@@ -60,32 +60,82 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Rate limiting check
+    // Rate limiting check - COUNT FROM CHAT_SESSIONS TABLE LIKE THE UI DOES
     const identifier = supabaseUserId || clientIP;
     const tier = getUserTier(userId ?? undefined);
+    const dailyLimit = QUOTA_CONFIG[tier].chat_messages_per_day;
     
-    let hourlyLimit, dailyLimit;
+    console.log('🚦 Channel chat rate limit check:', { identifier, tier, userId, dailyLimit });
+    
+    // Count messages from chat_messages table - SAME AS UI DOES
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    
+    let messageCount = 0;
+    
     try {
-      [hourlyLimit, dailyLimit] = await Promise.all([
-        checkRateLimit(identifier, 'chat', tier, 'hour'),
-        checkRateLimit(identifier, 'chat', tier, 'day')
-      ]);
-    } catch (rateLimitError) {
-      console.error('Rate limit check failed:', rateLimitError);
-      hourlyLimit = { allowed: true, limit: 30, remaining: 29, resetTime: new Date(Date.now() + 3600000) };
-      dailyLimit = { allowed: true, limit: 30, remaining: 29, resetTime: new Date(Date.now() + 86400000) };
-    }
-    
-    if (!hourlyLimit.allowed || !dailyLimit.allowed) {
+      if (supabaseUserId) {
+        // Count messages sent today by authenticated user
+        const { data: messages } = await supabaseAdmin
+          .from('chat_messages')
+          .select(`
+            id,
+            chat_sessions!inner (
+              id,
+              user_id
+            )
+          `, { count: 'exact' })
+          .eq('chat_sessions.user_id', supabaseUserId)
+          .eq('role', 'user')
+          .gte('created_at', today.toISOString())
+          .lt('created_at', tomorrow.toISOString());
+        
+        messageCount = messages?.length || 0;
+      } else if (anonId) {
+        // Count messages sent today by anonymous user
+        const { data: messages } = await supabaseAdmin
+          .from('chat_messages')
+          .select(`
+            id,
+            chat_sessions!inner (
+              id,
+              anon_id
+            )
+          `, { count: 'exact' })
+          .eq('chat_sessions.anon_id', anonId)
+          .eq('role', 'user')
+          .gte('created_at', today.toISOString())
+          .lt('created_at', tomorrow.toISOString());
+        
+        messageCount = messages?.length || 0;
+      }
+      
+      console.log('📊 Channel chat message count from chat_sessions:', messageCount, '/', dailyLimit);
+      
+      if (messageCount >= dailyLimit) {
+        console.log('🚫 CHANNEL CHAT RATE LIMIT EXCEEDED! User has', messageCount, 'messages, limit is', dailyLimit);
+        httpStatus = 429;
+        return NextResponse.json({
+          error: `You've reached your daily limit of ${dailyLimit} messages. Please try again tomorrow.`,
+          rateLimited: true,
+          limit: dailyLimit,
+          remaining: 0,
+          messageCount: messageCount,
+          resetTime: tomorrow
+        }, { status: 429 });
+      }
+      
+      console.log('✅ Channel chat rate limit check passed:', messageCount, '<', dailyLimit);
+      
+    } catch (error) {
+      console.error('Failed to check message count:', error);
+      // On error, be conservative and block
       httpStatus = 429;
-      const limit = !hourlyLimit.allowed ? hourlyLimit : dailyLimit;
       return NextResponse.json({
-        error: `Rate limit exceeded. You can send ${limit.limit} messages per ${!hourlyLimit.allowed ? 'hour' : 'day'}.`,
-        rateLimited: true,
-        limit: limit.limit,
-        remaining: limit.remaining,
-        resetTime: limit.resetTime,
-        retryAfter: limit.retryAfter
+        error: 'Unable to verify message limit. Please try again later.',
+        rateLimited: true
       }, { status: 429 });
     }
     
@@ -419,15 +469,7 @@ ${context}`;
       max_tokens: 1500, // Increased to allow listing all videos when requested
     });
     
-    // Increment rate limit
-    try {
-      await Promise.all([
-        incrementRateLimit(identifier, 'chat', 'hour'),
-        incrementRateLimit(identifier, 'chat', 'day')
-      ]);
-    } catch (error) {
-      console.error('Failed to increment rate limit:', error);
-    }
+    // No longer using broken rate limit increment - we count from chat_sessions table
     
     // Save initial user message
     if (!currentSessionId.startsWith('temp_')) {
@@ -478,29 +520,14 @@ ${context}`;
     // Pipe through transform stream
     const responseStream = readableStream.pipeThrough(transformStream);
     
-    // Get updated rate limit info
-    let updatedHourlyLimit, updatedDailyLimit;
-    try {
-      [updatedHourlyLimit, updatedDailyLimit] = await Promise.all([
-        checkRateLimit(identifier, 'chat', tier, 'hour'),
-        checkRateLimit(identifier, 'chat', tier, 'day')
-      ]);
-    } catch (error) {
-      updatedHourlyLimit = hourlyLimit;
-      updatedDailyLimit = dailyLimit;
-    }
-    
     return new Response(responseStream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'X-Session-ID': currentSessionId,
         'X-Channel-Title': encodeURIComponent(channel.title), // Encode to handle Unicode characters
-        'X-RateLimit-Limit-Hourly': updatedHourlyLimit.limit.toString(),
-        'X-RateLimit-Remaining-Hourly': updatedHourlyLimit.remaining.toString(),
-        'X-RateLimit-Reset-Hourly': Math.floor(updatedHourlyLimit.resetTime.getTime() / 1000).toString(),
-        'X-RateLimit-Limit-Daily': updatedDailyLimit.limit.toString(),
-        'X-RateLimit-Remaining-Daily': updatedDailyLimit.remaining.toString(),
-        'X-RateLimit-Reset-Daily': Math.floor(updatedDailyLimit.resetTime.getTime() / 1000).toString(),
+        'X-RateLimit-Limit-Daily': dailyLimit.toString(),
+        'X-RateLimit-Remaining-Daily': Math.max(0, dailyLimit - (messageCount + 1)).toString(),
+        'X-RateLimit-Reset-Daily': Math.floor(tomorrow.getTime() / 1000).toString(),
         'X-Video-Mapping': encodeURIComponent(JSON.stringify(timestampToVideo)) // Encode JSON as well
       },
     });
