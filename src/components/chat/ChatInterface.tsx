@@ -61,7 +61,7 @@ export function ChatInterface({
   onMessagesUpdate
 }: ChatInterfaceProps) {
   const { isSignedIn, user } = useUser();
-  const { rateLimitData, updateFromResponse, refreshRateLimit } = useRateLimit();
+  const { rateLimitData, updateFromResponse } = useRateLimit();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -83,7 +83,6 @@ export function ChatInterface({
   const [messageCountLoaded, setMessageCountLoaded] = useState<boolean>(false);
   const [showLimitError, setShowLimitError] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const migrationAttemptedRef = useRef(false);
   const urlCleanedRef = useRef(false);
 
   const scrollToBottom = () => {
@@ -396,46 +395,8 @@ export function ChatInterface({
           })
           .catch(err => console.error('Failed to fetch initial message count:', err));
       });
-      // Reset migration flag when user logs out
-      migrationAttemptedRef.current = false;
     }
   }, [isSignedIn]);
-
-  // Handle session migration only once when user signs in
-  useEffect(() => {
-    if (isSignedIn && user && !migrationAttemptedRef.current) {
-      // Check if we have an anonymous ID to migrate from
-      const storedAnonId = localStorage.getItem('vidsift_anon_id');
-      
-      if (storedAnonId) {
-        migrationAttemptedRef.current = true;
-        console.log('🔄 Attempting session migration for newly signed-in user');
-        
-        // User just signed in, try to migrate their anonymous sessions
-        import('./../../lib/migrate-sessions').then(async ({ migrateSessionsViaAPI }) => {
-          try {
-            const result = await migrateSessionsViaAPI();
-            if (result.success && result.sessions_migrated && result.sessions_migrated > 0) {
-              console.log(`✅ Migrated ${result.sessions_migrated} session(s)`);
-              // Clear anonymous ID after successful migration
-              localStorage.removeItem('vidsift_anon_id');
-              setAnonId(null);
-              // Refresh rate limit after migration
-              if (refreshRateLimit) {
-                refreshRateLimit();
-              }
-            }
-          } catch (error) {
-            // Don't throw or show error to user - migration is optional
-            console.log('Session migration skipped:', error);
-          }
-        });
-      } else {
-        // No anonymous ID to migrate
-        migrationAttemptedRef.current = true;
-      }
-    }
-  }, [isSignedIn, user]);
 
   // Auto-search with initial question from URL parameter
   useEffect(() => {
