@@ -305,6 +305,14 @@ export async function createChannel(channel: Omit<Channel, 'id' | 'created_at'>)
       console.error('Supabase admin client not available');
       return null;
     }
+    
+    // Validate YouTube channel ID format
+    if (!channel.youtube_channel_id || 
+        (!channel.youtube_channel_id.startsWith('UC') && 
+         !channel.youtube_channel_id.startsWith('HC'))) {
+      console.error('Invalid YouTube channel ID format:', channel.youtube_channel_id);
+      return null;
+    }
 
     // Check if channel already exists (regardless of owner)
     const { data: existingChannel } = await supabaseAdmin
