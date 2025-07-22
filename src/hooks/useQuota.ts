@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useUser } from '@clerk/nextjs';
+import { QUOTA_CONFIG, getUserTier } from '@/lib/rate-limit';
 
 interface QuotaData {
   quotaUsed: number;
@@ -18,7 +19,7 @@ export function useQuota(): QuotaData {
   const { user } = useUser();
   const [quotaData, setQuotaData] = useState<QuotaData>({
     quotaUsed: 0,
-    quotaLimit: 30,
+    quotaLimit: QUOTA_CONFIG.anonymous.chat_messages_per_day, // Use config default
     channelsUsed: 0,
     channelLimit: 1,
     userType: 'anonymous',
@@ -33,57 +34,33 @@ export function useQuota(): QuotaData {
 
         // Determine user type
         const userType = user ? 'user' : 'anonymous';
+        const tier = getUserTier(user?.id);
         
-        // Set initial limits (will be updated from API)
-        let baseQuotaLimit = 30; // Default fallback
-        let baseChannelLimit = 1;
+        // Set initial limits from config (will be updated from API)
+        let baseQuotaLimit = QUOTA_CONFIG[tier].chat_messages_per_day;
+        let baseChannelLimit = QUOTA_CONFIG[tier].channels_per_user || 1;
 
         // Fetch real usage stats from API
         let quotaUsed = 0;
         let channelsUsed = 0;
 
+        // Just use the message count API that works everywhere else
         try {
-          // Fetch usage stats which includes limits and current usage
-          console.log('🔍 useQuota: Fetching usage stats, user:', user?.id);
-          const response = await fetch('/api/user/usage-stats');
+          const headers: any = {};
+          if (!user) {
+            const anonId = localStorage.getItem('vidsift_anon_id');
+            if (anonId) {
+              headers['x-anon-id'] = anonId;
+            }
+          }
+          
+          const response = await fetch('/api/user/message-count', { headers });
           if (response.ok) {
             const data = await response.json();
-            console.log('📊 useQuota: Usage stats response:', data);
-            
-            // Extract daily limits and usage
-            if (data.stats?.chat?.daily) {
-              baseQuotaLimit = data.stats.chat.daily.limit;
-              quotaUsed = data.stats.chat.daily.limit - data.stats.chat.daily.remaining;
-            }
-            
-            if (data.stats?.channelProcess) {
-              baseChannelLimit = data.stats.channelProcess.limit;
-              channelsUsed = data.stats.channelProcess.limit - data.stats.channelProcess.remaining;
-            }
-          } else {
-            console.error('❌ useQuota: Failed to fetch usage stats, status:', response.status);
+            quotaUsed = data.count || 0;
           }
         } catch (error) {
-          console.error('Failed to fetch usage stats from API:', error);
-          
-          // Fallback to message count API
-          try {
-            const headers: any = {};
-            if (!user) {
-              const anonId = localStorage.getItem('vidsift_anon_id');
-              if (anonId) {
-                headers['x-anon-id'] = anonId;
-              }
-            }
-            
-            const response = await fetch('/api/user/message-count', { headers });
-            if (response.ok) {
-              const data = await response.json();
-              quotaUsed = data.count || 0;
-            }
-          } catch (error) {
-            console.error('Failed to fetch message count:', error);
-          }
+          console.error('Failed to fetch message count:', error);
         }
 
         setQuotaData({

@@ -38,7 +38,7 @@ export default function Home() {
   const questionRef = useRef<HTMLTextAreaElement>(null);
   
   // Real quota data
-  const { quotaUsed, quotaLimit, channelsUsed, channelLimit, userType } = useQuota();
+  const { quotaUsed, quotaLimit, channelsUsed, channelLimit, userType, isLoading: quotaLoading } = useQuota();
 
   // Prevent hydration issues by only rendering animations on client
   useEffect(() => {
@@ -367,6 +367,7 @@ export default function Home() {
           channelsUsed={channelsUsed}
           channelLimit={channelLimit}
           userType={userType}
+          isLoading={quotaLoading}
         />
         
         <Card className="overflow-visible">

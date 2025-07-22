@@ -14,6 +14,7 @@ interface BetaMessagingProps {
   channelsUsed: number;
   channelLimit: number;
   userType: 'anonymous' | 'user' | 'premium';
+  isLoading?: boolean;
 }
 
 export function BetaMessaging({ 
@@ -21,7 +22,8 @@ export function BetaMessaging({
   quotaLimit, 
   channelsUsed, 
   channelLimit, 
-  userType 
+  userType,
+  isLoading = false
 }: BetaMessagingProps) {
   const { user } = useUser();
   const [waitlistStatus, setWaitlistStatus] = useState<{
@@ -168,7 +170,11 @@ export function BetaMessaging({
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-gray-600" />
             <p className="text-sm text-gray-500">
-              You&apos;re at <span className="font-bold">{quotaUsed} / {quotaLimit}</span> free questions today
+              {isLoading ? (
+                'Loading...'
+              ) : (
+                <>You&apos;re at <span className="font-bold">{quotaUsed} / {quotaLimit}</span> free questions today</>
+              )}
             </p>
           </div>
         </CardContent>
