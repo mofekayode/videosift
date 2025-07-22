@@ -119,23 +119,34 @@ export default function ChannelChatPage() {
 
     messages.forEach(msg => {
       console.log('Processing message:', msg);
+      console.log('Message videoMapping:', msg.videoMapping);
+      
       if (msg.role === 'assistant' && msg.content) {
         // Use video mapping if available
         const videoMapping = msg.videoMapping || {};
         
-        // Extract all timestamps
-        const citationRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g;
+        // Extract all timestamps - handle both old and new citation formats
+        // Format: [12:34] or [12:34] "Video Title"
+        const citationRegex = /\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\](?:\s*"([^"]+)")?/g;
         let match;
+        let citationCount = 0;
         
         while ((match = citationRegex.exec(msg.content)) !== null) {
+          citationCount++;
           const timestamp = match[2] ? `${match[1]} - ${match[2]}` : match[1];
           const startTimestamp = match[1]; // Use first timestamp for lookup
+          const videoTitle = match[3]; // Video title from citation (if present)
+          
+          console.log(`Found citation #${citationCount}:`, { timestamp, videoTitle, startTimestamp });
           
           // Check if we have a mapping for this timestamp
           let targetVideo = null;
-          if (videoMapping[startTimestamp]) {
+          if (videoMapping && videoMapping[startTimestamp]) {
             const mappedVideoId = videoMapping[startTimestamp].videoId;
             targetVideo = channelVideos.find(v => v.youtube_id === mappedVideoId);
+            if (targetVideo) {
+              console.log('✅ Found video from mapping:', targetVideo.title);
+            }
           }
           
           // Fallback: try to find video by looking for title in nearby text
@@ -178,6 +189,11 @@ export default function ChannelChatPage() {
 
     const newRefs = Array.from(videoMap.values());
     console.log('=== Video Extraction Debug ===');
+    console.log('Total messages processed:', messages.length);
+    console.log('Total citations found across all messages:', messages.filter(m => m.role === 'assistant').reduce((count, msg) => {
+      const matches = msg.content?.match(/\[(\d{1,3}:\d{2}(?::\d{2})?)(?:\s*-\s*(\d{1,3}:\d{2}(?::\d{2})?))?\]/g);
+      return count + (matches?.length || 0);
+    }, 0));
     console.log('Channel videos available:', channelVideos.map(v => ({ youtube_id: v.youtube_id, title: v.title })));
     console.log('Extracted referenced videos:', newRefs);
     console.log('Video mappings from messages:', messages.filter(m => m.videoMapping).map(m => m.videoMapping));

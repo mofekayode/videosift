@@ -944,7 +944,7 @@ export function ChatInterface({
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const question = channelId ? "What are the main themes across all videos?" : "Give me the key takeaways";
+                  const question = "Give me the key takeaways";
                   const userMessage: ChatMessage = {
                     id: Date.now().toString(),
                     session_id: sessionId || '',
@@ -959,7 +959,7 @@ export function ChatInterface({
                 className="text-sm bg-background hover:bg-muted/50"
                 disabled={isLoading}
               >
-                {channelId ? "Main themes" : "Key takeaways"}
+               Key takeaways
               </Button>
               <Button
                 variant="outline"

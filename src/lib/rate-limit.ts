@@ -35,8 +35,8 @@ export const QUOTA_CONFIG: QuotaConfig = {
     video_uploads_per_day: 2,
   },
   user: {
-    chat_messages_per_day: 3,
-    chat_messages_per_hour: 3,
+    chat_messages_per_day: 10,
+    chat_messages_per_hour: 10,
     video_uploads_per_day: 10,
     channels_per_user: 1,
   },
