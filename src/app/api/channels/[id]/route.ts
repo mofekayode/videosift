@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { ensureUserExists } from '@/lib/user-sync';
 import { cacheManager, CacheManager, CACHE_CONFIG } from '@/lib/cache';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -31,11 +31,7 @@ export async function GET(
 
     const channelId = id;
     
-    // Create admin client to bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Use the imported admin client to bypass RLS
     
     // Check cache first
     const cacheKey = `${CacheManager.channelDataKey(channelId)}:${user.id}`;

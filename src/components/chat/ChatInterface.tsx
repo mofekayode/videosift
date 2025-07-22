@@ -19,6 +19,7 @@ import { useRateLimit } from '@/hooks/useRateLimit';
 import { supabase } from '@/lib/supabase';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { QUOTA_CONFIG, getUserTier } from '@/lib/rate-limit';
 
 interface ChatInterfaceProps {
   videoId?: string;
@@ -87,6 +88,12 @@ export function ChatInterface({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Get the user's daily message limit based on their tier
+  const getDailyLimit = () => {
+    const tier = getUserTier(user?.id);
+    return QUOTA_CONFIG[tier].chat_messages_per_day;
   };
 
   // Load previous messages when continuing a session
@@ -437,7 +444,7 @@ export function ChatInterface({
       setAutoSearchExecuted(true);
       
       // Check if user has already exceeded limit before auto-searching
-      const dailyLimit = rateLimitData?.daily.limit || 17;
+      const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
       if (todayMessageCount >= dailyLimit) {
         console.log('🚫 Auto-search blocked: Daily limit exceeded');
         const limitMessage: ChatMessage = {
@@ -503,7 +510,7 @@ export function ChatInterface({
     if (!videoId && !channelId) return;
     
     // Check rate limit before processing auto-search
-    const dailyLimit = rateLimitData?.daily.limit || 17;
+    const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
     if (todayMessageCount >= dailyLimit) {
       console.log('🚫 Auto-search blocked in handleAutoSearch: Daily limit exceeded');
       setIsLoading(false);
@@ -568,7 +575,7 @@ export function ChatInterface({
           
           // Show toast for rate limit errors
           const messageCount = errorData.messageCount || todayMessageCount;
-          const limit = errorData.limit || rateLimitData?.daily.limit || 17;
+          const limit = errorData.limit || rateLimitData?.daily.limit || getDailyLimit();
           
           toast.error(`Daily limit exceeded! You've sent ${messageCount} out of ${limit} messages today.`, {
             duration: 5000,
@@ -784,7 +791,7 @@ export function ChatInterface({
     }
     
     // Check rate limit before sending - use actual message count
-    const dailyLimit = rateLimitData?.daily.limit || 17;
+    const dailyLimit = rateLimitData?.daily.limit || getDailyLimit();
     if (todayMessageCount >= dailyLimit) {
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -1034,7 +1041,7 @@ export function ChatInterface({
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MessageCircle className="w-4 h-4" />
-            <span>You&apos;re at <span className="font-semibold text-foreground">{todayMessageCount} / {rateLimitData?.daily.limit || 17}</span> free questions today</span>
+            <span>You&apos;re at <span className="font-semibold text-foreground">{todayMessageCount} / {rateLimitData?.daily.limit || getDailyLimit()}</span> free questions today</span>
           </div>
           
           {/* Rate Limit Error Banner */}
@@ -1042,7 +1049,7 @@ export function ChatInterface({
             <div className="mt-2 p-4 bg-red-100 dark:bg-red-950/40 border-2 border-red-500 dark:border-red-600 rounded-lg shadow-lg animate-pulse">
               <p className="text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 animate-bounce" />
-                Daily limit reached! You've used all {rateLimitData?.daily.limit || 17} messages for today.
+                Daily limit reached! You've used all {rateLimitData?.daily.limit || getDailyLimit()} messages for today.
               </p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-1 ml-7">
                 Try again tomorrow or upgrade for more messages.
@@ -1080,19 +1087,19 @@ export function ChatInterface({
               placeholder={
                 !messageCountLoaded
                   ? "Loading message count..."
-                  : todayMessageCount >= (rateLimitData?.daily.limit || 17)
-                  ? `Daily limit reached (${rateLimitData?.daily.limit || 17} messages). Try again tomorrow.`
+                  : todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())
+                  ? `Daily limit reached (${rateLimitData?.daily.limit || getDailyLimit()} messages). Try again tomorrow.`
                   : sessionInfo?.remaining === 0 
                     ? "Session limit reached - start a new chat" 
                     : "What do you want to know next?"
               }
-              disabled={isLoading || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || 17)}
+              disabled={isLoading || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())}
               className={`w-full resize-none border-0 bg-muted/50 rounded-xl p-4 pr-12 text-sm focus:ring-0 focus:outline-none focus:border-transparent focus:ring-transparent focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/60 min-h-[60px] max-h-40 ${showLimitError ? 'animate-shake' : ''}`}
               rows={2}
             />
             <Button 
               onClick={sendMessage} 
-              disabled={isLoading || !input.trim() || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || 17)}
+              disabled={isLoading || !input.trim() || !messageCountLoaded || todayMessageCount >= (rateLimitData?.daily.limit || getDailyLimit())}
               size="icon"
               className="absolute right-2 bottom-2 h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 disabled:bg-muted"
             >
