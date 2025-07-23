@@ -655,7 +655,7 @@ export default function Home() {
                   <Button 
                     variant="link" 
                     size="sm"
-                    onClick={() => handleUrlChange('https://www.youtube.com/watch?v=BHO_glbVcIg')}
+                    onClick={() => handleUrlChange('https://www.youtube.com/watch?v=C27RVio2rOs')}
                     className="p-0 h-auto text-sm text-primary hover:underline"
                   >
                     Use demo video

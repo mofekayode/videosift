@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { sendErrorNotification } from './email';
 
 export enum ErrorCategory {
   API_ERROR = 'api_error',
@@ -49,6 +50,7 @@ class ErrorTracker {
   private isProcessing = false;
   private maxQueueSize = 100;
   private flushInterval = 30000; // 30 seconds
+  private emailThrottle = new Map<string, number>(); // Prevent email spam
 
   private constructor() {
     // Flush errors periodically
@@ -118,6 +120,11 @@ class ErrorTracker {
       metadata: error.metadata
     });
 
+    // Send email notification for critical errors
+    if (this.shouldSendErrorEmail(error)) {
+      this.sendErrorEmail(error);
+    }
+
     // Flush immediately for critical errors
     if (error.severity === ErrorSeverity.CRITICAL) {
       this.flushErrors();
@@ -126,6 +133,48 @@ class ErrorTracker {
     // Prevent queue overflow
     if (this.errorQueue.length > this.maxQueueSize) {
       this.errorQueue = this.errorQueue.slice(-this.maxQueueSize);
+    }
+  }
+
+  private shouldSendErrorEmail(error: Omit<ErrorEvent, 'id' | 'timestamp' | 'resolved' | 'occurrence_count'>): boolean {
+    // Only send emails on server-side
+    if (typeof window !== 'undefined') {
+      return false;
+    }
+
+    // Send email for critical and high severity errors
+    if (error.severity !== ErrorSeverity.CRITICAL && error.severity !== ErrorSeverity.HIGH) {
+      return false;
+    }
+
+    // Throttle emails to prevent spam (1 email per error type per hour)
+    const throttleKey = `${error.category}-${error.message.substring(0, 50)}`;
+    const lastSent = this.emailThrottle.get(throttleKey);
+    const now = Date.now();
+    
+    if (lastSent && (now - lastSent) < 3600000) { // 1 hour
+      return false;
+    }
+
+    this.emailThrottle.set(throttleKey, now);
+    return true;
+  }
+
+  private async sendErrorEmail(error: Omit<ErrorEvent, 'id' | 'timestamp' | 'resolved' | 'occurrence_count'>): Promise<void> {
+    try {
+      await sendErrorNotification(
+        {
+          message: error.message,
+          type: error.category,
+          stack: error.stack
+        },
+        {
+          severity: error.severity,
+          ...error.context
+        }
+      );
+    } catch (emailError) {
+      console.error('Failed to send error email notification:', emailError);
     }
   }
 

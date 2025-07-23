@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { ErrorSeverity } from './error-tracking';
 
 // Initialize Resend with error handling
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -323,4 +324,193 @@ function getWelcomeEmailContent(userName: string): string {
     </body>
     </html>
   `;
+}
+
+// Server error notification functions
+export async function sendServerErrorNotification(errorData: {
+  message: string;
+  type?: string;
+  stack?: string;
+  severity?: ErrorSeverity;
+  context?: any;
+}) {
+  try {
+    console.log(`🚨 Sending error notification to admin`);
+
+    // Check if API key exists
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY is not configured');
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    const adminEmail = 'Mofekayode@gmail.com';
+    const emailContent = getServerErrorEmailContent(errorData);
+
+    const result = await resend.emails.send({
+      from: 'VidSift Alerts <alerts@vidsift.com>',
+      to: adminEmail,
+      subject: `🚨 Frontend Error: ${errorData.type || 'Unknown Error'}`,
+      html: emailContent
+    });
+
+    if (result.error) {
+      console.error('❌ Failed to send error notification:', result.error);
+      return { success: false, error: result.error.message || 'Email send failed' };
+    }
+
+    console.log('✅ Error notification sent successfully');
+    return { success: true, id: result.data?.id || 'sent' };
+
+  } catch (error: any) {
+    console.error('❌ Error notification failed:', error);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
+function getServerErrorEmailContent(errorData: any): string {
+  const timestamp = new Date().toISOString();
+  const environment = process.env.NODE_ENV || 'development';
+  
+  // Extract user information
+  const userInfo = errorData.context?.userInfo || {};
+  const hasUserInfo = userInfo.email || userInfo.name || userInfo.userId;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Frontend Error Alert - VidSift</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { background: #dc2626; color: white; padding: 32px 24px; text-align: center; }
+        .content { padding: 32px 24px; }
+        .user-info { background: #dbeafe; border: 2px solid #3b82f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .error-details { background: #fef2f2; border: 1px solid #fecaca; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .stack-trace { background: #1f2937; color: #10b981; padding: 16px; border-radius: 6px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+        .context-info { background: #f3f4f6; padding: 16px; border-radius: 6px; margin: 16px 0; }
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: #6b7280; font-size: 14px; }
+        .stat-value { font-weight: 600; color: #111827; font-size: 14px; }
+        .footer { background: #f8fafc; padding: 24px; text-align: center; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; }
+        .severity-${errorData.severity || 'medium'} { 
+          background: ${errorData.severity === 'critical' ? '#991b1b' : errorData.severity === 'high' ? '#dc2626' : '#f59e0b'};
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header severity-${errorData.severity || 'medium'}">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 700;">🚨 Frontend Error Alert</h1>
+          <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9;">Next.js Application Error</p>
+        </div>
+        
+        <div class="content">
+          ${hasUserInfo ? `
+          <div class="user-info">
+            <h3 style="margin: 0 0 16px 0; color: #1d4ed8; font-size: 20px;">👤 User Information</h3>
+            ${userInfo.name ? `<p style="margin: 0 0 8px 0; font-size: 16px; color: #111827;"><strong>Name:</strong> ${userInfo.name}</p>` : ''}
+            ${userInfo.email ? `<p style="margin: 0 0 8px 0; font-size: 16px; color: #111827;"><strong>Email:</strong> <a href="mailto:${userInfo.email}">${userInfo.email}</a></p>` : ''}
+            ${userInfo.userId ? `<p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>User ID:</strong> ${userInfo.userId}</p>` : ''}
+            ${userInfo.supabaseId ? `<p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Supabase ID:</strong> ${userInfo.supabaseId}</p>` : ''}
+          </div>
+          ` : `
+          <div class="user-info" style="background: #fef3c7; border-color: #f59e0b;">
+            <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 18px;">👤 User: Anonymous/Not Logged In</h3>
+            <p style="margin: 0; font-size: 14px; color: #92400e;">No user information available for this error.</p>
+          </div>
+          `}
+
+          <div class="error-details">
+            <h3 style="margin: 0 0 16px 0; color: #dc2626; font-size: 20px;">${errorData.type || 'Error'}</h3>
+            <p style="margin: 0 0 8px 0; font-size: 16px; color: #111827;"><strong>Message:</strong> ${errorData.message || 'Unknown error occurred'}</p>
+            <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Time:</strong> ${timestamp}</p>
+            <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Environment:</strong> ${environment}</p>
+            <p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Service:</strong> Frontend (Next.js)</p>
+            ${errorData.severity ? `<p style="margin: 0; font-size: 14px; color: #6b7280;"><strong>Severity:</strong> ${errorData.severity}</p>` : ''}
+          </div>
+
+          ${errorData.context ? `
+          <div class="context-info">
+            <h4 style="margin: 0 0 12px 0; color: #111827;">Request Context</h4>
+            ${errorData.context.apiEndpoint ? `
+            <div class="stat-row">
+              <span class="stat-label">API Endpoint</span>
+              <span class="stat-value">${errorData.context.apiEndpoint}</span>
+            </div>
+            ` : ''}
+            ${errorData.context.ipAddress ? `
+            <div class="stat-row">
+              <span class="stat-label">IP Address</span>
+              <span class="stat-value">${errorData.context.ipAddress}</span>
+            </div>
+            ` : ''}
+            ${errorData.context.sessionId ? `
+            <div class="stat-row">
+              <span class="stat-label">Session ID</span>
+              <span class="stat-value">${errorData.context.sessionId}</span>
+            </div>
+            ` : ''}
+            ${errorData.context.videoId ? `
+            <div class="stat-row">
+              <span class="stat-label">Video ID</span>
+              <span class="stat-value">${errorData.context.videoId}</span>
+            </div>
+            ` : ''}
+            ${errorData.context.channelId ? `
+            <div class="stat-row">
+              <span class="stat-label">Channel ID</span>
+              <span class="stat-value">${errorData.context.channelId}</span>
+            </div>
+            ` : ''}
+            ${errorData.context.userAgent ? `
+            <div class="stat-row">
+              <span class="stat-label">User Agent</span>
+              <span class="stat-value" style="font-size: 12px; word-break: break-all;">${errorData.context.userAgent}</span>
+            </div>
+            ` : ''}
+          </div>
+          ` : ''}
+
+          ${errorData.stack ? `
+          <div style="margin: 20px 0;">
+            <h4 style="margin: 0 0 12px 0; color: #111827;">Stack Trace</h4>
+            <div class="stack-trace">${errorData.stack}</div>
+          </div>
+          ` : ''}
+
+          <div style="margin: 32px 0; padding: 20px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px;">
+            <h4 style="margin: 0 0 8px 0; color: #92400e;">Action Required</h4>
+            <p style="margin: 0; color: #92400e; font-size: 14px;">
+              This error occurred in the frontend application. Please check the browser console and server logs for more details.
+            </p>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p style="margin: 0 0 8px 0;">VidSift Error Monitoring System</p>
+          <p style="margin: 0; font-size: 12px;">This is an automated alert from the frontend application.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// Helper function to send error notifications from API routes
+export async function sendErrorNotification(error: any, context?: any) {
+  try {
+    await sendServerErrorNotification({
+      message: error.message || String(error),
+      type: error.name || 'Error',
+      stack: error.stack,
+      severity: context?.severity || ErrorSeverity.HIGH,
+      context
+    });
+  } catch (emailError) {
+    console.error('Failed to send error email:', emailError);
+  }
 }
